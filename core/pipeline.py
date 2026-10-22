@@ -138,6 +138,16 @@ def _value(series: HourlySeries, name: str, index: int, default=None):
     return default if value is None else value
 
 
+def _surface_dewpoint_spread(series: HourlySeries, index: int) -> float | None:
+    """地面露点差（℃），用于云海能见度门控。"""
+    temperature = _value(series, "temperature_2m", index)
+    humidity = _value(series, "relative_humidity_2m", index)
+    if temperature is None or humidity is None:
+        return None
+    dewpoint = sea_of_clouds.saturation_dewpoint(float(temperature), float(humidity))
+    return float(temperature) - dewpoint
+
+
 def load_config(path=None) -> dict:
     """Load the spots configuration JSON."""
     target = Path(path) if path else DEFAULT_SPOTS_PATH
@@ -242,6 +252,8 @@ def _hourly_entry(spot: dict, series: HourlySeries, ground: GroundWeather, index
         _pressure_profile(series, index),
         viewpoint_elevation=float(spot["elevation_m"]),
         wind_speed=wind,
+        visibility_km=visibility_km,
+        dewpoint_spread=_surface_dewpoint_spread(series, index),
     )
 
     return {
@@ -579,6 +591,8 @@ def _snapshot_point(series: HourlySeries, index: int, lat: float, lon: float,
         _pressure_profile(series, index),
         viewpoint_elevation=float(elevation),
         wind_speed=wind,
+        visibility_km=visibility_km,
+        dewpoint_spread=_surface_dewpoint_spread(series, index),
     )
     return {
         "lat": lat,

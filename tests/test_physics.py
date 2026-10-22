@@ -258,6 +258,30 @@ class TestSeaOfClouds(unittest.TestCase):
         result = sea_of_clouds.compute_sci(profile, viewpoint_elevation=1000)
         self.assertEqual(result["status"], sea_of_clouds.STATUS_CLEAR)
 
+    def test_fog_visibility_blocks_overlook(self):
+        result = sea_of_clouds.compute_sci(
+            _sample_profile(), viewpoint_elevation=1400, visibility_km=0.9
+        )
+        self.assertNotEqual(result["status"], sea_of_clouds.STATUS_OVERLOOK)
+        self.assertLessEqual(result["sci"], 35.0)
+
+    def test_saturated_surface_blocks_overlook(self):
+        result = sea_of_clouds.compute_sci(
+            _sample_profile(), viewpoint_elevation=1400, dewpoint_spread=0.4
+        )
+        self.assertNotEqual(result["status"], sea_of_clouds.STATUS_OVERLOOK)
+        self.assertLessEqual(result["sci"], 35.0)
+
+    def test_clear_conditions_keep_overlook(self):
+        result = sea_of_clouds.compute_sci(
+            _sample_profile(),
+            viewpoint_elevation=1400,
+            visibility_km=12.0,
+            dewpoint_spread=4.0,
+        )
+        self.assertEqual(result["status"], sea_of_clouds.STATUS_OVERLOOK)
+        self.assertGreaterEqual(result["sci"], 60.0)
+
 
 class TestConfigAndSecrets(unittest.TestCase):
     def test_spots_json(self):

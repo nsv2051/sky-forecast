@@ -45,6 +45,8 @@ __all__ = [
     "VIEWPOINT_MARGIN_MIN",
     "MIN_INVERSION_STRENGTH",
     "DRY_ABOVE_MAX",
+    "VISIBILITY_MIN_KM",
+    "DEWPOINT_SPREAD_MIN",
     "is_mountain_viewpoint",
 ]
 
@@ -98,6 +100,10 @@ MOUNTAIN_MIN_ELEVATION = 200.0
 # 对齐青龙 SEA_MARGIN_MIN：云顶距山顶不足 30 m（或高于山顶）时，
 # 人在云里/云上，不能算俯瞰云海。
 VIEWPOINT_MARGIN_MIN = 30.0
+# 对齐青龙硬闸门：能见度低于 3km 说明人在雾中，不能判俯瞰云海。
+VISIBILITY_MIN_KM = 3.0
+# 对齐青龙硬闸门：地面露点差低于 1.5℃ 说明近饱和/雾，不能判俯瞰云海。
+DEWPOINT_SPREAD_MIN = 1.5
 
 
 def is_mountain_viewpoint(elevation_m: float) -> bool:
@@ -293,7 +299,14 @@ def _overlook_score(inversion_strength: float, mean_rh: float, margin: float, rh
     }
 
 
-def compute_sci(profile, viewpoint_elevation: float, wind_speed: float | None = None) -> dict:
+def compute_sci(
+    profile,
+    viewpoint_elevation: float,
+    wind_speed: float | None = None,
+    *,
+    visibility_km: float | None = None,
+    dewpoint_spread: float | None = None,
+) -> dict:
     """Compute the Sea of Clouds Index for a spot at *viewpoint_elevation*.
 
     Parameters
@@ -306,6 +319,13 @@ def compute_sci(profile, viewpoint_elevation: float, wind_speed: float | None = 
         Spot DEM elevation in metres.
     wind_speed:
         Optional surface wind (m/s). Very strong wind raises a small penalty.
+    visibility_km:
+        Optional surface visibility in kilometres. Below ``VISIBILITY_MIN_KM``
+        the spot is treated as inside fog and never scored as an overlook.
+    dewpoint_spread:
+        Optional surface dew-point spread in degC. Below
+        ``DEWPOINT_SPREAD_MIN`` the surface is near saturation / foggy and
+        never scored as an overlook.
 
     Returns
     -------
@@ -339,6 +359,21 @@ def compute_sci(profile, viewpoint_elevation: float, wind_speed: float | None = 
         status = STATUS_CLEAR
         sci = 5.0
         components["note"] = "云顶之上整层饱和"
+    elif (
+        overlook_allowed
+        and viewpoint_elevation >= cloud["top"]
+        and (
+            (visibility_km is not None and visibility_km < VISIBILITY_MIN_KM)
+            or (dewpoint_spread is not None and dewpoint_spread < DEWPOINT_SPREAD_MIN)
+        )
+    ):
+        # 雾中/近饱和时人其实在云里，硬闸门压掉"俯瞰云海"的假阳。
+        status = STATUS_IN_CLOUD
+        sci = 5.0
+        if visibility_km is not None and visibility_km < VISIBILITY_MIN_KM:
+            components["note"] = "雾中能见度不足"
+        else:
+            components["note"] = "近饱和露点差不足"
     elif overlook_allowed and viewpoint_elevation >= cloud["top"]:
         status = STATUS_OVERLOOK
         margin = viewpoint_elevation - cloud["top"]
