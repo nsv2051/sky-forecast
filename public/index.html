@@ -398,7 +398,7 @@
   }
   .ov-head, .ov-row {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1.15fr) repeat(3, minmax(0, 1fr));
+    grid-template-columns: 24px minmax(0, 1.25fr) repeat(3, minmax(0, 1.15fr));
     align-items: center;
     column-gap: var(--space-3);
     width: 100%;
@@ -414,7 +414,11 @@
   .ov-head-badge { width: 24px; height: 24px; }
   .ov-head .ov-day .d { font-size: 11px; font-weight: 600; color: var(--text-2); }
   .ov-head .ov-day .w { font-size: 11px; font-weight: 500; color: var(--text-3-ink); margin-top: 1px; }
-  .ov-head .ov-day .u { font-size: 11px; font-weight: 500; color: var(--text-3-ink); opacity: 0.75; margin-top: 2px; }
+  .ov-head .ov-day .u {
+    font-size: 11px; font-weight: 500; color: var(--text-3-ink); opacity: 0.75; margin-top: 2px;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; width: 100%;
+  }
+  .ov-head .ov-day .u span { text-align: center; white-space: nowrap; }
   .ov-row {
     border: 0; border-top: 0.5px solid var(--separator);
     background: transparent; color: inherit; font-family: inherit;
@@ -448,8 +452,18 @@
     font-variant-numeric: tabular-nums;
   }
   .ov-day {
-    display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0;
+    display: flex; align-items: center; justify-content: center; gap: 1px; min-width: 0;
     border-left: 0.5px solid var(--separator); padding-left: 12px; padding-right: 12px;
+  }
+  .ov-head .ov-day { flex-direction: column; }
+  .ov-tri { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; width: 100%; }
+  .ov-m { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
+  .ov-m .k { font-size: 10.5px; font-weight: 600; color: var(--text-3-ink); line-height: 1.1; }
+  .ov-m b { font-size: 13px; font-weight: 760; font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .ov-m.is-dim b { color: var(--text-3-ink); font-weight: 600; }
+  .ov-times {
+    font-size: 11px; font-weight: 500; color: var(--text-3-ink); margin-top: 2px;
+    font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .ov-day .s {
     font-size: 12.5px; font-weight: 760; color: var(--text);
@@ -479,24 +493,28 @@
   }
   .ov-day.is-empty .s { color: var(--text-3-ink); font-weight: 600; }
   @media (max-width: 860px) {
-    .ov-head, .ov-row { grid-template-columns: 22px minmax(0, 1.2fr) repeat(3, minmax(0, 1fr)); column-gap: 10px; }
+    .ov-head, .ov-row { grid-template-columns: 22px minmax(0, 1.25fr) repeat(3, minmax(0, 1.15fr)); column-gap: 10px; }
     .ov-name .m .region { display: none; }
     .ov-name .m2 { display: none; }
     .ov-day { padding-left: 10px; padding-right: 10px; }
   }
   @media (max-width: 560px) {
-    .ov-head, .ov-row { grid-template-columns: minmax(0, 1fr) repeat(3, 52px); column-gap: 6px; padding: 8px 12px; }
+    .ov-head, .ov-row { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, 1.15fr)); column-gap: 6px; padding: 8px 12px; }
     .ov-badge, .ov-head-badge { display: none; }
     .ov-day { padding-left: 8px; padding-right: 8px; }
     .ov-day .s { font-size: 11.5px; }
     .ov-day .t .k { display: none; }
     .ov-sea { display: none; }
     .ov-day .s em { display: none; }
+    .ov-m .k { font-size: 10px; }
+    .ov-m b { font-size: 12px; }
+    .ov-head .ov-day .u { font-size: 10px; gap: 2px; }
   }
   @media (max-width: 380px) {
-    .ov-head, .ov-row { grid-template-columns: minmax(0, 1fr) repeat(3, 44px); column-gap: 4px; padding: 8px 10px; }
-    .ov-day { padding-left: 6px; padding-right: 6px; }
+    .ov-head, .ov-row { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, 1.1fr)); column-gap: 4px; padding: 8px 10px; }
+    .ov-day { padding-left: 4px; padding-right: 4px; }
     .ov-day .s { font-size: 11px; }
+    .ov-times { display: none; }
     .compact-dec-strip .cds-reasons { white-space: normal; overflow: visible; text-overflow: clip; }
     .compact-dec-strip { align-items: flex-start; }
     .cds-right { padding-top: 1px; }
@@ -1183,6 +1201,43 @@
       return out;
     }
 
+    /* 每日拆分为日出 / 日落 / 云海三档，口径与 dayPeaks 一致。 */
+    function daySplit(spot) {
+      var out = {};
+      if (!spot) return out;
+      (spot.hourly || []).forEach(function (h) {
+        var e = h.sun_elevation;
+        if (e == null || e < -5 || e > 8) return;
+        var date = (h.time_local || "").slice(0, 10);
+        if (!date) return;
+        var r = out[date];
+        if (!r) {
+          r = out[date] = {
+            date: date,
+            sunrise: { bci: null, grade: "", time: "" },
+            sunset: { bci: null, grade: "", time: "" },
+            sci: { value: null, time: "" }
+          };
+        }
+        var slot = num(h.sun_hour_angle) > 0 ? r.sunset : r.sunrise;
+        if (h.bci != null && (slot.bci == null || num(h.bci) > slot.bci)) {
+          slot.bci = num(h.bci);
+          slot.grade = h.bci_grade || "";
+        }
+        if (h.sci != null && (r.sci.value == null || num(h.sci) > r.sci.value)) {
+          r.sci.value = num(h.sci);
+          r.sci.time = (h.time_local || "").slice(11, 16);
+        }
+      });
+      if (spot.lat != null && spot.lon != null) {
+        Object.keys(out).forEach(function (d) {
+          out[d].sunrise.time = formatMin(eventMinutes(spot, d, "sunrise"));
+          out[d].sunset.time = formatMin(eventMinutes(spot, d, "sunset"));
+        });
+      }
+      return out;
+    }
+
     /* 所选事件那一刻的单点读数。
        与 PRO 宫格同源（hourlyAtEvent + resolveEvent），
        保证同一屏上下所有数字都指向同一个时刻。 */
@@ -1602,23 +1657,30 @@
         var hc = el("div", "ov-day");
         hc.appendChild(el("div", "d", date.slice(5).replace("-", "/")));
         hc.appendChild(el("div", "w", weekdayOf(date)));
-        hc.appendChild(el("div", "u", "BCI \u00b7 \u4e91\u6d77"));
+        var hu = el("div", "u");
+        hu.appendChild(el("span", null, "\u65e5\u51fa"));
+        hu.appendChild(el("span", null, "\u65e5\u843d"));
+        hu.appendChild(el("span", null, "\u4e91\u6d77"));
+        hc.appendChild(hu);
         head.appendChild(hc);
       });
       list.appendChild(head);
 
       spots.forEach(function (s) {
-        var days = dayPeaks(s);
+        var splits = daySplit(s);
         var row = el("button", "ov-row");
         row.type = "button";
         row.dataset.spotId = s.id;
         row.setAttribute("aria-pressed", "false");
 
         var dayText = dates.map(function (date) {
-          var p = days[date];
-          if (!p || p.bci <= 0) return date.slice(5).replace("-", "/") + " \u65e0\u6570\u636e";
-          return date.slice(5).replace("-", "/") + " " + (p.kind === "sunset" ? "\u65e5\u843d" : "\u65e5\u51fa") +
-            " " + p.time + "\uff0c" + Math.round(p.bci) + "\u5206";
+          var sp = splits[date];
+          if (!sp) return date.slice(5).replace("-", "/") + " \u65e0\u6570\u636e";
+          var srb = sp.sunrise && sp.sunrise.bci != null ? Math.round(sp.sunrise.bci) : "\u2014";
+          var ssb = sp.sunset && sp.sunset.bci != null ? Math.round(sp.sunset.bci) : "\u2014";
+          var scb = sp.sci && sp.sci.value != null ? Math.round(sp.sci.value) : "\u2014";
+          return date.slice(5).replace("-", "/") + " \u65e5\u51fa" + srb +
+            " \u65e5\u843d" + ssb + " \u4e91\u6d77" + scb;
         }).join("\uff1b");
         row.setAttribute("aria-label", s.name + "\uff0c" + (s.region || "") + "\uff0c\u6d77\u62d4" +
           num(s.elevation_m) + "\u7c73\uff1a" + dayText);
@@ -1631,6 +1693,18 @@
         meta.appendChild(document.createTextNode(num(s.elevation_m) + " m"));
         nameWrap.appendChild(meta);
 
+        if (dates[0] && s.lat != null && s.lon != null) {
+          var timesEl = el("div", "ov-times",
+            "\u65e5\u51fa " + formatMin(eventMinutes(s, dates[0], "sunrise")) +
+            " \u00b7 \u65e5\u843d " + formatMin(eventMinutes(s, dates[0], "sunset")));
+          timesEl.title = dates.map(function (d) {
+            return d.slice(5).replace("-", "/") +
+              " \u51fa " + formatMin(eventMinutes(s, d, "sunrise")) +
+              " \u843d " + formatMin(eventMinutes(s, d, "sunset"));
+          }).join(" \u00b7 ");
+          nameWrap.appendChild(timesEl);
+        }
+
         var dir = (s.orientation && s.orientation.primary) || "";
         var focal = s.recommended_focal_length_mm;
         var m2bits = [];
@@ -1640,37 +1714,31 @@
         row.appendChild(nameWrap);
 
         dates.forEach(function (date) {
-          var pk = days[date];
+          var sp = splits[date];
           var cell = el("div", "ov-day");
-          if (!pk || pk.bci <= 0) {
-            cell.classList.add("is-empty");
-            cell.appendChild(el("div", "s", "\u2014"));
-          } else {
-            var sc = el("div", "s");
-            sc.appendChild(document.createTextNode(pk.kind === "sunset" ? "\uD83C\uDF07" : "\uD83C\uDF05"));
-            sc.appendChild(el("b", null, String(Math.round(pk.bci))));
-            if (pk.bci_grade) sc.appendChild(el("em", null, pk.bci_grade));
-            cell.appendChild(sc);
-
-            var tline = el("div", "t", pk.time);
-            tline.appendChild(el("span", "k", pk.kind === "sunset" ? "\u843d" : "\u51fa"));
-            cell.appendChild(tline);
-
-            var sea = el("div", "ov-sea");
-            var sb = el("span", "sb");
-            var si = el("i");
-            var pct = clamp(Math.round(pk.bci), 0, 100);
-            si.style.width = Math.max(pct, 3) + "%";
-            si.style.background = bciColor(pk.bci);
-            sb.appendChild(si);
-            sea.appendChild(sb);
-            sea.appendChild(el("span", "sv", "\u4e91" + Math.round(pk.sci)));
-            cell.appendChild(sea);
-
-            cell.title = date + " \u00b7 " + (pk.kind === "sunset" ? "\u65e5\u843d" : "\u65e5\u51fa") +
-              " " + pk.time + " \u00b7 BCI " + Math.round(pk.bci) + " \u00b7 " + (pk.bci_grade || "\u2014") +
-              " \u00b7 \u4e91\u6d77 " + Math.round(pk.sci);
-          }
+          var tri = el("div", "ov-tri");
+          var items = [
+            { k: "\u51fa", time: sp && sp.sunrise ? sp.sunrise.time : "", score: sp && sp.sunrise ? sp.sunrise.bci : null },
+            { k: "\u843d", time: sp && sp.sunset ? sp.sunset.time : "", score: sp && sp.sunset ? sp.sunset.bci : null },
+            { k: "\u4e91", time: sp && sp.sci ? sp.sci.time : "", score: sp && sp.sci ? sp.sci.value : null }
+          ];
+          items.forEach(function (it) {
+            var m = el("div", "ov-m");
+            m.appendChild(el("span", "k", it.k));
+            var b = el("b", null, it.score == null ? "\u2014" : String(Math.round(it.score)));
+            if (it.score == null) m.classList.add("is-dim");
+            else b.style.color = bciColor(it.score);
+            m.appendChild(b);
+            tri.appendChild(m);
+          });
+          cell.appendChild(tri);
+          if (!sp) cell.classList.add("is-empty");
+          cell.title = date.slice(5).replace("-", "/") +
+            " \u65e5\u51fa " + (items[0].time || "\u2014") +
+            " BCI " + (items[0].score == null ? "\u2014" : Math.round(items[0].score)) +
+            " \u00b7 \u65e5\u843d " + (items[1].time || "\u2014") +
+            " BCI " + (items[1].score == null ? "\u2014" : Math.round(items[1].score)) +
+            " \u00b7 \u4e91\u6d77 SCI " + (items[2].score == null ? "\u2014" : Math.round(items[2].score));
           row.appendChild(cell);
         });
 
@@ -1686,7 +1754,8 @@
       if (state.selectedSpotId) syncOverviewActive(state.selectedSpotId);
 
       var note = $("overviewNote");
-      if (note) note.textContent = spots.length + " 个机位 · 未来三天 · BCI 火烧云指数 / SCI 云海指数，满分 100，≥60 值得出门";
+      if (note) note.textContent = spots.length +
+        " 个机位 · 未来三天 · 每格依次为日出 BCI / 日落 BCI / 云海 SCI，满分 100";
     }
 
     function gradePill(label, value, grade, color, dateStr) {
@@ -1828,14 +1897,8 @@
         var opt = document.createElement("option");
         opt.value = s.id;
         var wps = windowPeaks(s);
-        var bci = wps.bci;
-        var sci = wps.sci;
         var topScore = wps.lead;
-        var ico = wps.isFire ? "🔥" : "☁️";
-        /* 这里的分数是 windowPeaks 的三日最高，不随所选时刻变化；
-           必须写明「三日最高」，否则会和下方跟随时刻的面板分数打架。 */
-        opt.textContent = ico + " " + s.name + " (" + (s.region || "") + " · 三日最高 " +
-          Math.round(topScore) + "分)";
+        opt.textContent = s.name;
         sel.appendChild(opt);
         if (topScore > bestScore) {
           bestScore = topScore;
