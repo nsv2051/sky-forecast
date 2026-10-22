@@ -1,0 +1,36 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "outputDirectory": "public",
+  "functions": {
+    "api/forecast.py": {
+      "runtime": "python3.12",
+      "memory": 256,
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/data/forecast.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, s-maxage=300, stale-while-revalidate=600"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
+      ]
+    }
+  ]
+}

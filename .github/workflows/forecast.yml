@@ -1,0 +1,103 @@
+name: Generate & Deploy Sky Forecast
+
+# Builds public/data/forecast.json from live ECMWF data, then publishes the
+# static site to GitHub Pages. The generated JSON is uploaded as a Pages
+# artifact and never committed back, keeping the repository history small.
+# Requires Pages to be enabled with "GitHub Actions" as the source.
+
+on:
+  schedule:
+    # Every 2 hours (UTC). GitHub may delay scheduled runs under load.
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      force_mock:
+        description: "Force deterministic offline data (no network calls)"
+        type: boolean
+        default: false
+  push:
+    branches: [main, master]
+    paths:
+      - "core/**"
+      - "config/**"
+      - "public/index.html"
+      - "scripts/generate_forecast.py"
+      - ".github/workflows/forecast.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: sky-forecast-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      TZ: Asia/Shanghai
+      # Optional secrets. When absent the pipeline falls back to neutral
+      # ground observations, so the workflow succeeds with no configuration.
+      QWEATHER_KEY: ${{ secrets.QWEATHER_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies (stdlib only)
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+
+      - name: Generate forecast JSON
+        run: |
+          if [ "${{ github.event.inputs.force_mock }}" = "true" ]; then
+            python3 scripts/generate_forecast.py --mock --no-grid
+          else
+            python3 scripts/generate_forecast.py --no-grid
+          fi
+
+      - name: Verify generated data
+        run: |
+          test -s public/data/forecast.json
+          python3 - <<'PY'
+          import json
+          with open("public/data/forecast.json", encoding="utf-8") as fh:
+              doc = json.load(fh)
+          meta = doc["meta"]
+          assert meta["spot_count"] > 0, "no spots generated"
+          assert doc["summary"], "empty summary"
+          print("generated_at", meta["generated_at"])
+          print("spots", meta["spot_count"])
+          print("summary", [day["date"] for day in doc["summary"]])
+          PY
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

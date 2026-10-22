@@ -1,0 +1,234 @@
+{
+  "meta": {
+    "name": "sky-forecast",
+    "region": "河南中西部 · 伏牛山脉及周边",
+    "timezone": "Asia/Shanghai",
+    "utc_offset_hours": 8,
+    "datum": "WGS84",
+    "elevation_source": "DEM",
+    "updated": "2026-10-17",
+    "spot_catalog": "QINGLONG_SPOT_CATALOG"
+  },
+  "spots": [
+    {
+      "id": "zhengzhou_urban",
+      "name": "郑州市区",
+      "lat": 34.7466,
+      "lon": 113.6254,
+      "elevation_m": 109,
+      "region": "郑州·市区",
+      "city": "郑州",
+      "preferences": {
+        "sea_of_clouds": false,
+        "burning_cloud": true,
+        "priority": "high"
+      },
+      "recommended_focal_length_mm": [35, 70],
+      "orientation": {
+        "primary": "W",
+        "azimuth_deg": 270,
+        "description": "城市天际线火烧云，西向地平线光路，受 AQI 与地面能见度影响明显"
+      }
+    },
+    {
+      "id": "nanyang_urban",
+      "name": "南阳市区",
+      "lat": 32.9908,
+      "lon": 112.5286,
+      "elevation_m": 126,
+      "region": "南阳·市区",
+      "city": "南阳",
+      "preferences": {
+        "sea_of_clouds": false,
+        "burning_cloud": true,
+        "priority": "medium"
+      },
+      "recommended_focal_length_mm": [35, 70],
+      "orientation": {
+        "primary": "W",
+        "azimuth_deg": 268,
+        "description": "白河平原火烧云，西向开阔地平线，城市低空薄霾需长焦压暗"
+      }
+    },
+    {
+      "id": "songshan_junjifeng",
+      "name": "嵩山·峻极峰",
+      "lat": 34.4839,
+      "lon": 112.9519,
+      "elevation_m": 814,
+      "region": "郑州·登封",
+      "city": "郑州",
+      "preferences": {
+        "sea_of_clouds": true,
+        "burning_cloud": true,
+        "priority": "high"
+      },
+      "recommended_focal_length_mm": [70, 200],
+      "orientation": {
+        "primary": "E",
+        "azimuth_deg": 90,
+        "description": "东向俯瞰逆温云海与日出，长焦压缩远山，兼顾晚霞火烧云"
+      }
+    },
+    {
+      "id": "songshan_yunding",
+      "name": "嵩山·云顶草甸",
+      "lat": 34.4820,
+      "lon": 112.9420,
+      "elevation_m": 1200,
+      "region": "郑州·登封",
+      "city": "郑州",
+      "preferences": {
+        "sea_of_clouds": true,
+        "burning_cloud": true,
+        "priority": "high"
+      },
+      "recommended_focal_length_mm": [24, 70],
+      "orientation": {
+        "primary": "E",
+        "azimuth_deg": 88,
+        "description": "云顶草甸视野极佳，东南向俯瞰云海漫过山脊，广角到中焦兼具"
+      }
+    },
+    {
+      "id": "wuzhiling",
+      "name": "五指岭",
+      "lat": 34.59617,
+      "lon": 113.14898,
+      "elevation_m": 1121,
+      "region": "郑州·新密",
+      "city": "郑州",
+      "preferences": {
+        "sea_of_clouds": true,
+        "burning_cloud": true,
+        "priority": "high"
+      },
+      "recommended_focal_length_mm": [24, 105],
+      "orientation": {
+        "primary": "W",
+        "azimuth_deg": 265,
+        "description": "西向晚霞火烧云与东向云海双向可拍，山脊落差分明的云瀑机位"
+      }
+    },
+    {
+      "id": "laojunshan_jinding",
+      "name": "老君山·金顶",
+      "lat": 33.7400,
+      "lon": 111.6389,
+      "elevation_m": 1228,
+      "region": "洛阳·栾川",
+      "city": "洛阳",
+      "preferences": {
+        "sea_of_clouds": true,
+        "burning_cloud": true,
+        "priority": "high"
+      },
+      "recommended_focal_length_mm": [70, 200],
+      "orientation": {
+        "primary": "E",
+        "azimuth_deg": 92,
+        "description": "仙山云海金顶，东南向俯瞰层云翻涌，长焦取金顶浮于云上的经典构图"
+      }
+    },
+    {
+      "id": "baiyunshan_yuhuangding",
+      "name": "白云山·玉皇顶",
+      "lat": 33.6644,
+      "lon": 111.8608,
+      "elevation_m": 1527,
+      "region": "洛阳·嵩县",
+      "city": "洛阳",
+      "preferences": {
+        "sea_of_clouds": true,
+        "burning_cloud": true,
+        "priority": "high"
+      },
+      "recommended_focal_length_mm": [24, 70],
+      "orientation": {
+        "primary": "E",
+        "azimuth_deg": 95,
+        "description": "伏牛极顶俯瞰云海最稳机位，东南向巨幅云海日出，广角收纳群山"
+      }
+    },
+    {
+      "id": "laojieling_jijiaojian",
+      "name": "老界岭·犄角尖",
+      "lat": 33.6417,
+      "lon": 111.7635,
+      "elevation_m": 1101,
+      "region": "南阳·西峡",
+      "city": "南阳",
+      "preferences": {
+        "sea_of_clouds": true,
+        "burning_cloud": true,
+        "priority": "high"
+      },
+      "recommended_focal_length_mm": [24, 105],
+      "orientation": {
+        "primary": "E",
+        "azimuth_deg": 90,
+        "description": "伏牛分水岭，东南向云海沿沟谷抬升，中焦表现云瀑与山脊层次"
+      }
+    },
+    {
+      "id": "tongbaishan_taibaiding",
+      "name": "桐柏山·太白顶",
+      "lat": 32.3373,
+      "lon": 113.3330,
+      "elevation_m": 672,
+      "region": "南阳·桐柏",
+      "city": "南阳",
+      "preferences": {
+        "sea_of_clouds": true,
+        "burning_cloud": true,
+        "priority": "medium"
+      },
+      "recommended_focal_length_mm": [70, 200],
+      "orientation": {
+        "primary": "E",
+        "azimuth_deg": 90,
+        "description": "淮河源头云海，东向俯瞰云雾漫谷，长焦压缩层叠山峦"
+      }
+    },
+    {
+      "id": "wuduoshan",
+      "name": "五朵山",
+      "lat": 33.5500,
+      "lon": 112.2361,
+      "elevation_m": 447,
+      "region": "南阳·南召",
+      "city": "南阳",
+      "preferences": {
+        "sea_of_clouds": true,
+        "burning_cloud": true,
+        "priority": "medium"
+      },
+      "recommended_focal_length_mm": [24, 70],
+      "orientation": {
+        "primary": "E",
+        "azimuth_deg": 88,
+        "description": "奇峰云海，低海拔机位需逆温强时方可俯瞰，广角表现峥嵘峰林"
+      }
+    },
+    {
+      "id": "baotianman",
+      "name": "宝天曼",
+      "lat": 33.2000,
+      "lon": 111.9333,
+      "elevation_m": 225,
+      "region": "南阳·内乡",
+      "city": "南阳",
+      "preferences": {
+        "sea_of_clouds": true,
+        "burning_cloud": true,
+        "priority": "medium"
+      },
+      "recommended_focal_length_mm": [35, 105],
+      "orientation": {
+        "primary": "E",
+        "azimuth_deg": 90,
+        "description": "原始森林晨雾云海，林间低空平流雾机位，中焦表现雾带穿林"
+      }
+    }
+  ]
+}

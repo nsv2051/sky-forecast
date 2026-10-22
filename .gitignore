@@ -1,0 +1,25 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Local runtime output
+public/data/*.json
+!public/data/.gitkeep
+
+# Local preview service (scripts/manage.sh)
+.run/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

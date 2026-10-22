@@ -1,0 +1,1909 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="auto">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#0a84ff" />
+<title>郑州及周边 · 天空观景指数</title>
+<meta name="description" content="郑州及周边 150km 火烧云、云海与日出日落观景指数预报，基于 ECMWF、和风天气与大气光路物理推算。" />
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    --radius-xs: 10px;
+    --radius-sm: 14px;
+    --radius-md: 20px;
+    --radius-lg: 28px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+    --maxw: 1180px;
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+    /* Semantic light palette */
+    --bg: #f5f5f7;
+    --bg-grad-a: #eef3fb;
+    --bg-grad-b: #f7f4f1;
+    --surface: rgba(255, 255, 255, 0.72);
+    --surface-solid: #ffffff;
+    --surface-2: rgba(255, 255, 255, 0.55);
+    --border: rgba(0, 0, 0, 0.08);
+    --separator: rgba(60, 60, 67, 0.14);
+    --text: #1c1c1e;
+    --text-2: #48484a;
+    --text-3: #8e8e93;
+    --accent: #0a84ff;
+    --accent-soft: rgba(10, 132, 255, 0.14);
+    --good: #30d158;
+    --fair: #ffd60a;
+    --poor: #ff9f0a;
+    --bad: #ff453a;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.10);
+    --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.16);
+    /* Text-only ink variants (WCAG AA ≥4.5:1 on light surfaces) */
+    --text-3-ink: #68686d;
+    --accent-ink: #0066cc;
+    --good-ink: #157a33;
+    --fair-ink: #7a5600;
+    --poor-ink: #9a4a00;
+    --bad-ink: #b02318;
+  }
+
+  html[data-theme="dark"] {
+    --bg: #000000;
+    --bg-grad-a: #0b1020;
+    --bg-grad-b: #10100f;
+    --surface: rgba(28, 28, 30, 0.72);
+    --surface-solid: #1c1c1e;
+    --surface-2: rgba(44, 44, 46, 0.55);
+    --border: rgba(255, 255, 255, 0.10);
+    --separator: rgba(84, 84, 88, 0.5);
+    --text: #f5f5f7;
+    --text-2: #c7c7cc;
+    --text-3: #8e8e93;
+    --accent: #0a84ff;
+    --accent-soft: rgba(10, 132, 255, 0.22);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 18px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 10px 34px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 26px 70px rgba(0, 0, 0, 0.7);
+    --text-3-ink: #a1a1a6;
+    --accent-ink: #4da3ff;
+    --good-ink: #30d158;
+    --fair-ink: #ffd60a;
+    --poor-ink: #ff9f0a;
+    --bad-ink: #ff453a;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html[data-theme="auto"] {
+      --bg: #000000;
+      --bg-grad-a: #0b1020;
+      --bg-grad-b: #10100f;
+      --surface: rgba(28, 28, 30, 0.72);
+      --surface-solid: #1c1c1e;
+      --surface-2: rgba(44, 44, 46, 0.55);
+      --border: rgba(255, 255, 255, 0.10);
+      --separator: rgba(84, 84, 88, 0.5);
+      --text: #f5f5f7;
+      --text-2: #c7c7cc;
+      --text-3: #8e8e93;
+      --accent-soft: rgba(10, 132, 255, 0.22);
+      --text-3-ink: #a1a1a6;
+      --accent-ink: #4da3ff;
+      --good-ink: #30d158;
+      --fair-ink: #ffd60a;
+      --poor-ink: #ff9f0a;
+      --bad-ink: #ff453a;
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html[data-theme="auto"] .ov-row:hover { background: rgba(255,255,255,0.06); }
+  }
+
+  .skip-link {
+    position: absolute; left: -9999px; top: 0; z-index: 200;
+    padding: 10px 16px; border-radius: 0 0 10px 0;
+    background: var(--accent); color: #fff;
+    font-size: 14px; font-weight: 640; text-decoration: none;
+  }
+  .skip-link:focus { left: 0; outline: 2px solid #fff; outline-offset: -4px; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    font-family: var(--font-sans);
+    color: var(--text);
+    background:
+      radial-gradient(1200px 700px at 12% -10%, var(--bg-grad-a), transparent 60%),
+      radial-gradient(1000px 600px at 95% 0%, var(--bg-grad-b), transparent 55%),
+      var(--bg);
+    background-attachment: fixed;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  button { font-family: inherit; }
+  [hidden] { display: none !important; }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--space-4); }
+
+  /* ---------------- Nav ---------------- */
+  .nav-outer {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    padding-top: env(safe-area-inset-top);
+    background: color-mix(in srgb, var(--bg) 62%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(22px);
+    backdrop-filter: saturate(180%) blur(22px);
+    border-bottom: 0.5px solid var(--separator);
+  }
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    height: 56px;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 0 var(--space-4);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand-mark {
+    width: 32px; height: 32px; flex: none;
+    border-radius: 9px;
+    background: linear-gradient(140deg, #ffd60a, #ff9f0a 42%, #ff375f 78%, #bf5af2);
+    box-shadow: 0 4px 14px rgba(255, 90, 60, 0.35), inset 0 0 0 0.5px rgba(255,255,255,0.4);
+  }
+  .brand-title { font-size: 16px; font-weight: 650; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brand-sub { font-size: 12px; color: var(--text-3-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-spacer { flex: 1 1 auto; }
+  .nav-meta { display: flex; align-items: center; gap: var(--space-2); color: var(--text-3-ink); font-size: 12px; }
+  .src-chips { display: none; gap: 6px; }
+  @media (min-width: 780px) { .src-chips { display: flex; } }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 560; color: var(--text-2);
+    background: var(--surface-2); border: 0.5px solid var(--border);
+    padding: 4px 9px; border-radius: 999px; white-space: nowrap;
+  }
+  .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+
+  .icon-btn {
+    -webkit-appearance: none; appearance: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: 44px; min-width: 44px; padding: 0 12px;
+    border-radius: 999px; border: 0.5px solid var(--border);
+    background: var(--surface-2); color: var(--text);
+    font-size: 13px; font-weight: 560; cursor: pointer;
+    transition: transform 0.18s var(--ease), background 0.18s var(--ease);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .icon-btn:hover { background: var(--accent-soft); }
+  .icon-btn:active { transform: scale(0.94); }
+  .icon-btn svg { width: 17px; height: 17px; }
+  .icon-btn.spin svg { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .icon-btn .label { display: none; }
+  @media (min-width: 560px) { .icon-btn .label { display: inline; } }
+
+  /* ---------------- Hero / Banner ---------------- */
+  .hero { padding: var(--space-6) 0 var(--space-4); }
+  .hero h1 {
+    margin: 0 0 var(--space-2);
+    font-size: clamp(26px, 5.2vw, 40px);
+    line-height: 1.12; font-weight: 720; letter-spacing: -0.03em;
+  }
+  .hero h1 .grad {
+    background: linear-gradient(96deg, #ff9f0a, #ff375f 55%, #bf5af2);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { margin: 0; color: var(--text-2); font-size: 15px; max-width: 62ch; }
+
+  .banner { margin-top: var(--space-5); }
+  .banner-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
+  .banner-head h2 { margin: 0; font-size: 20px; font-weight: 680; letter-spacing: -0.02em; }
+  .banner-head .hint { color: var(--text-3-ink); font-size: 13px; }
+  .banner-scroll { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, 1fr); gap: var(--space-3); overflow-x: auto; padding: 4px 4px var(--space-4); scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+  @media (min-width: 900px) { .banner-scroll { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); overflow: visible; } }
+
+  .day-card {
+    scroll-snap-align: start;
+    position: relative; overflow: hidden;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-sm);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease);
+  }
+  .day-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .day-card.golden::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+    background: linear-gradient(90deg, #ffd60a, #ff9f0a, #ff375f, #bf5af2);
+  }
+  .day-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .day-date { font-size: 15px; font-weight: 650; }
+  .day-week { color: var(--text-3-ink); font-weight: 500; margin-left: 6px; font-size: 13px; }
+  .ribbon {
+    font-size: 11px; font-weight: 650; color: #1c1c1e;
+    background: linear-gradient(90deg, #ff9f0a, #ff375f);
+    padding: 3px 9px; border-radius: 999px; letter-spacing: 0.01em;
+    box-shadow: 0 3px 10px rgba(255, 55, 95, 0.32);
+  }
+  .slot { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 0.5px solid var(--separator); }
+  .slot:first-of-type { margin-top: var(--space-3); }
+  .slot-icon { font-size: 20px; width: 30px; text-align: center; flex: none; }
+  .slot-body { min-width: 0; flex: 1; }
+  .slot-label { font-size: 12px; color: var(--text-3-ink); font-weight: 560; }
+  .slot-main { font-size: 14px; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slot-sub { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slot-empty { color: var(--text-3-ink); font-size: 13px; }
+
+  .index-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 46px; padding: 5px 9px; border-radius: 12px;
+    font-size: 14px; font-weight: 720; font-variant-numeric: tabular-nums;
+    color: #1c1c1e;
+  }
+
+  /* ---------------- Section / cards ---------------- */
+  section { margin-top: var(--space-6); }
+  .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+  .section-head h2 { margin: 0; font-size: clamp(20px, 3.5vw, 26px); font-weight: 700; letter-spacing: -0.025em; }
+  .section-head p { margin: 4px 0 0; color: var(--text-3-ink); font-size: 13px; }
+
+  .panel {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    overflow: hidden;
+  }
+
+  .legend-note { font-size: 12px; color: var(--text-3-ink); }
+
+  /* ---------------- Single-point detail (full width) ---------------- */
+  .detail-col {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .side-detail-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: visible;
+  }
+  .side-detail-card, .detail-card, .panel-block, .detail-head, .pro-grid, .pro-cell {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+    word-break: break-word !important;
+  }
+  /* ---------------- Compact decision strip (single-point) ---------------- */
+  .detail-head-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .spot-select-control {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-xs);
+    padding: 11px 14px;
+    min-height: 44px;
+    outline: none;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+  }
+  .detail-selects {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .detail-selects .spot-select-control {
+    min-width: 0;
+    max-width: 100%;
+    text-overflow: ellipsis;
+  }
+  @media (max-width: 560px) {
+    .detail-selects { width: 100%; flex-direction: column; align-items: stretch; }
+    .detail-selects .spot-select-control { width: 100%; }
+  }
+
+  #detailSection .section-head { margin-bottom: var(--space-3); }
+  .detail-card {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden;
+  }
+  .detail-head {
+    display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+    padding: var(--space-4) var(--space-4) var(--space-3);
+    border-bottom: 0.5px solid var(--separator);
+    background: linear-gradient(120deg, var(--surface-2), transparent);
+  }
+  .detail-head .dh-name { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .detail-head .dh-meta { font-size: 12.5px; color: var(--text-3-ink); }
+  .detail-head .dh-snap {
+    margin-left: auto; font-size: 11.5px; font-weight: 640; color: var(--accent-ink);
+    background: var(--accent-soft); padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+  }
+  .detail-card .panel-block { padding: var(--space-4) var(--space-4) 0; }
+  .detail-card .panel-block + .panel-block { padding-top: var(--space-3); }
+  .detail-card .panel-block:last-child { padding-bottom: var(--space-4); }
+  .detail-empty { padding: var(--space-6) var(--space-4); text-align: center; color: var(--text-3-ink); font-size: 13px; }
+
+  /* ---------------- Detail two-column ---------------- */
+  .detail-cols { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+  .detail-cols > .dcol { min-width: 0; }
+  @media (min-width: 980px) {
+    .detail-cols {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: var(--space-5); align-items: stretch;
+      padding: 0 var(--space-4) var(--space-4);
+    }
+    .detail-cols .panel-block { padding-left: 0; padding-right: 0; }
+    .detail-cols .dcol-right .panel-block { padding-top: var(--space-4); }
+    .detail-cols .dcol { display: flex; flex-direction: column; }
+    .detail-cols .dcol-right { justify-content: flex-start; }
+  }
+
+  /* ---------------- Compact spot cards ---------------- */
+  .spot-grades { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+  .spot-grade {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11.5px; font-weight: 620; padding: 4px 10px; border-radius: 999px;
+    border: 0.5px solid var(--border); background: var(--surface-2); color: var(--text-2);
+    white-space: nowrap; max-width: 100%;
+  }
+  .spot-grade b { font-variant-numeric: tabular-nums; font-weight: 720; color: var(--text); }
+  .spot-grade .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .spot-grade .pill-date { margin-left: 5px; font-size: 11px; font-weight: 500; color: var(--text-3-ink); }
+  .detail-head .icon-btn { margin-left: 0; }
+
+  /* ---------------- Spot overview (table) ---------------- */
+  .ov-list {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+    overflow: hidden; min-width: 0;
+  }
+  .ov-head, .ov-row {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1.15fr) repeat(3, minmax(0, 1fr));
+    align-items: center;
+    column-gap: var(--space-3);
+    width: 100%;
+    padding: 9px var(--space-4);
+  }
+  .ov-head {
+    background: var(--surface-2);
+    border-bottom: 0.5px solid var(--separator);
+  }
+  .ov-head-name {
+    font-size: 11px; font-weight: 650; color: var(--text-3-ink); letter-spacing: 0.02em;
+  }
+  .ov-head-badge { width: 24px; height: 24px; }
+  .ov-head .ov-day .d { font-size: 11px; font-weight: 600; color: var(--text-2); }
+  .ov-head .ov-day .w { font-size: 11px; font-weight: 500; color: var(--text-3-ink); margin-top: 1px; }
+  .ov-head .ov-day .u { font-size: 11px; font-weight: 500; color: var(--text-3-ink); opacity: 0.75; margin-top: 2px; }
+  .ov-row {
+    border: 0; border-top: 0.5px solid var(--separator);
+    background: transparent; color: inherit; font-family: inherit;
+    text-align: left; cursor: pointer; min-height: 48px;
+    transition: background 0.18s var(--ease);
+  }
+  .ov-row:first-of-type { border-top: 0; }
+  .ov-row:hover { background: var(--surface-2); }
+  .ov-row.is-active { background: var(--accent-soft); }
+  .ov-row.is-active .ov-name .n::after { content: " · 当前"; font-size: 11px; font-weight: 600; color: var(--accent-ink); }
+  html[data-theme="dark"] .ov-row:hover { background: rgba(255,255,255,0.06); }
+  .ov-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .ov-name { min-width: 0; }
+  .ov-name .n {
+    font-size: 14px; font-weight: 660; letter-spacing: -0.01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ov-name .m {
+    font-size: 11px; color: var(--text-3-ink); margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ov-name .m2 {
+    font-size: 11px; font-weight: 500; color: var(--text-3-ink); margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ov-badge {
+    flex: none; width: 24px; height: 24px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11.5px; font-weight: 780; letter-spacing: 0.02em;
+    color: var(--accent-ink); background: var(--accent-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .ov-day {
+    display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0;
+    border-left: 0.5px solid var(--separator); padding-left: 12px; padding-right: 12px;
+  }
+  .ov-day .s {
+    font-size: 12.5px; font-weight: 760; color: var(--text);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .ov-day .t {
+    font-size: 11px; font-weight: 500; color: var(--text-3-ink);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .ov-day .t .k { margin-left: 3px; }
+  .ov-day .s b {
+    font-weight: 800; font-variant-numeric: tabular-nums; margin-left: 3px;
+  }
+  .ov-day .s em {
+    font-style: normal; font-size: 11px; font-weight: 600; color: var(--text-3-ink);
+    margin-left: 5px;
+  }
+  .ov-sea { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 3px; }
+  .ov-sea .sb {
+    flex: 1 1 auto; min-width: 24px; height: 3px; border-radius: 999px;
+    background: var(--separator); overflow: hidden;
+  }
+  .ov-sea .sb > i { display: block; height: 100%; border-radius: 999px; }
+  .ov-sea .sv {
+    flex: none; font-size: 11px; font-weight: 600; color: var(--text-3-ink);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .ov-day.is-empty .s { color: var(--text-3-ink); font-weight: 600; }
+  @media (max-width: 860px) {
+    .ov-head, .ov-row { grid-template-columns: 22px minmax(0, 1.2fr) repeat(3, minmax(0, 1fr)); column-gap: 10px; }
+    .ov-name .m .region { display: none; }
+    .ov-name .m2 { display: none; }
+    .ov-day { padding-left: 10px; padding-right: 10px; }
+  }
+  @media (max-width: 560px) {
+    .ov-head, .ov-row { grid-template-columns: minmax(0, 1fr) repeat(3, 52px); column-gap: 6px; padding: 8px 12px; }
+    .ov-badge, .ov-head-badge { display: none; }
+    .ov-day { padding-left: 8px; padding-right: 8px; }
+    .ov-day .s { font-size: 11.5px; }
+    .ov-day .t .k { display: none; }
+    .ov-sea { display: none; }
+    .ov-day .s em { display: none; }
+  }
+  @media (max-width: 380px) {
+    .ov-head, .ov-row { grid-template-columns: minmax(0, 1fr) repeat(3, 44px); column-gap: 4px; padding: 8px 10px; }
+    .ov-day { padding-left: 6px; padding-right: 6px; }
+    .ov-day .s { font-size: 11px; }
+    .compact-dec-strip .cds-reasons { white-space: normal; overflow: visible; text-overflow: clip; }
+    .compact-dec-strip { align-items: flex-start; }
+    .cds-right { padding-top: 1px; }
+  }
+
+  /* ---------------- Timeline (实战时刻) ---------------- */
+  .timeline { display: flex; flex-wrap: nowrap; overflow: hidden; padding: 6px 2px 8px; }
+  .tl-item { position: relative; flex: 1 1 0; min-width: 0; padding: 0 4px; text-align: center; }
+  .tl-item::before { content: ""; position: absolute; top: 10px; left: 0; right: 0; height: 2px; background: var(--separator); }
+  .tl-item:first-child::before { left: 50%; }
+  .tl-item:last-child::before { right: 50%; }
+  .tl-dot {
+    position: relative; z-index: 1; width: 22px; height: 22px; margin: 0 auto;
+    border-radius: 50%; display: grid; place-items: center; font-size: 11px;
+    background: var(--surface-solid); border: 2px solid var(--accent);
+    box-shadow: 0 0 0 4px var(--surface);
+  }
+  .tl-dot.blue { border-color: #5b8def; }
+  .tl-dot.touch { border-color: #ff9f0a; }
+  .tl-dot.peak { border-color: #ff375f; box-shadow: 0 0 0 4px color-mix(in srgb, #ff375f 18%, transparent); }
+  .tl-dot.golden { border-color: #ffd60a; }
+  .tl-time { font-size: 12px; font-weight: 720; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .tl-label { font-size: 11.5px; color: var(--text-2); font-weight: 640; }
+  .tl-desc { font-size: 11px; color: var(--text-3-ink); margin-top: 2px; }
+
+  
+  /* ---------------- Compact Decision Strip ---------------- */
+  .compact-dec-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    color: #fff;
+    margin-top: 4px;
+    box-shadow: var(--shadow-sm);
+  }
+  .compact-dec-strip.go { background: linear-gradient(110deg, #c2410c, #d81b60 70%, #a02cf0); }
+  .compact-dec-strip.wait { background: linear-gradient(110deg, #b45309, #a34d00); }
+  .compact-dec-strip.rest { background: linear-gradient(110deg, #64748b, #475569); }
+  .cds-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .cds-tag { font-size: 14.5px; font-weight: 750; letter-spacing: -0.01em; }
+  .cds-score { font-size: 12px; opacity: 1; margin-left: 6px; font-weight: 600; }
+  .cds-reasons { font-size: 11px; opacity: 0.96; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cds-right { text-align: right; flex: none; display: flex; flex-direction: column; align-items: flex-end; }
+  .cds-prob { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .cds-cap { font-size: 11px; opacity: 0.95; margin-top: 2px; }
+
+  /* 窄屏允许云量行折行，避免在 390–430px 区间被 ellipsis 截断。
+     必须放在上面的基础规则之后，否则同优先级会被后者覆盖。 */
+  @media (max-width: 560px) {
+    .cds-reasons { white-space: normal; overflow: visible; text-overflow: clip; }
+    .compact-dec-strip { align-items: flex-start; }
+  }
+
+  /* ---------------- PRO grid + sub panels ---------------- */
+  .panel-block { padding: 0 var(--space-4) var(--space-3); }
+  .panel-block .pb-title {
+    font-size: 13px; font-weight: 700; color: var(--text);
+    letter-spacing: -0.01em;
+    margin-bottom: var(--space-3); display: flex; align-items: center; gap: 6px;
+  }
+  .panel-block .pb-title .tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; padding: 1px 7px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent-ink);
+  }
+  .pro-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .pro-cell { min-width: 0; overflow: hidden; background: var(--surface-2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 9px 10px; }
+  .pro-k { font-size: 11px; color: var(--text-3-ink); font-weight: 560; display: flex; gap: 4px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pro-v { font-size: 16px; font-weight: 760; font-variant-numeric: tabular-nums; margin-top: 2px; letter-spacing: -0.02em; line-height: 1.15; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  .pro-v b { font-weight: 760; white-space: nowrap; }
+  .pro-v em { font-size: 11px; font-weight: 500; color: var(--text-2); font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .pro-v small { font-size: 11px; font-weight: 600; opacity: 0.7; }
+  .pro-bar { height: 3px; border-radius: 999px; background: var(--separator); overflow: hidden; margin-top: 5px; }
+  .pro-bar > i { display: block; height: 100%; border-radius: 999px; }
+
+  .conf-row {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2); margin-top: var(--space-3);
+  }
+  .conf-cell {
+    min-width: 0; background: var(--surface-2); border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 9px 10px;
+  }
+  .conf-cell .ck { font-size: 11px; color: var(--text-3-ink); font-weight: 560; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conf-cell .cv { font-size: 15px; font-weight: 760; font-variant-numeric: tabular-nums; margin-top: 2px; letter-spacing: -0.02em; line-height: 1.15; }
+  .conf-cell .cv small { font-size: 11px; font-weight: 600; opacity: 0.7; }
+  .conf-cell .cg { font-size: 11px; color: var(--text-2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conf-bar { height: 3px; border-radius: 999px; background: var(--separator); overflow: hidden; margin-top: 6px; }
+  .conf-bar > i { display: block; height: 100%; border-radius: 999px; }
+  @media (max-width: 560px) {
+    .conf-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .conf-cell:last-child { grid-column: 1 / -1; }
+  }
+
+  .decision-tag {
+    flex: none; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+    color: #fff; white-space: nowrap;
+  }
+  .decision-tag.go { background: linear-gradient(96deg, #c2410c, #d81b60); }
+  .decision-tag.wait { background: linear-gradient(96deg, #b45309, #a34d00); }
+  .decision-tag.rest { background: #475569; }
+
+  .metric .sub { font-size: 11px; color: var(--text-3-ink); margin-top: 3px; }
+
+  /* ---------------- Skeletons / empty ---------------- */
+  .skel { border-radius: var(--radius-md); background: linear-gradient(100deg, var(--surface-2) 30%, color-mix(in srgb, var(--surface-2) 45%, transparent) 50%, var(--surface-2) 70%); background-size: 220% 100%; animation: shimmer 1.3s infinite; }
+  @keyframes shimmer { to { background-position: -220% 0; } }
+  .empty { padding: var(--space-6) var(--space-4); text-align: center; color: var(--text-3-ink); }
+  .empty .big { font-size: 34px; margin-bottom: var(--space-3); }
+
+  /* ---------------- Footer ---------------- */
+  footer { margin: var(--space-7) 0 var(--space-6); }
+  .foot {
+    border-top: 0.5px solid var(--separator);
+    padding-top: var(--space-5);
+    color: var(--text-3-ink); font-size: 12.5px;
+    display: flex; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap;
+  }
+  .foot a { color: var(--text-2); display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px);
+    background: var(--surface-solid); color: var(--text); border: 0.5px solid var(--border);
+    box-shadow: var(--shadow-lg); border-radius: 14px; padding: 10px 18px; font-size: 13px; font-weight: 560;
+    opacity: 0; pointer-events: none; transition: all 0.3s var(--ease); z-index: 2000;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  /* Print */
+  @media print {
+    .nav-outer, .toast { display: none !important; }
+  }
+</style>
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">跳到主要内容</a>
+  <div class="nav-outer">
+    <nav class="nav" aria-label="主导航">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div style="min-width:0">
+          <div class="brand-title">郑州及周边 · 天空观景指数</div>
+          <div class="brand-sub" id="brandSub">正在加载…</div>
+        </div>
+      </div>
+      <div class="nav-spacer"></div>
+      <div class="src-chips" id="srcChips" aria-label="数据源"></div>
+      <button class="icon-btn" id="refreshBtn" type="button" title="刷新数据" aria-label="刷新数据">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        <span class="label">刷新</span>
+      </button>
+      <button class="icon-btn" id="themeBtn" type="button" title="切换深色 / 浅色" aria-label="切换深色浅色模式">
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+    </nav>
+  </div>
+
+  <main class="wrap" id="mainContent" tabindex="-1">
+    <header class="hero">
+      <h1>捕捉下一场 <span class="grad">火烧云</span> 与云海</h1>
+      <p>基于 ECMWF 高空气压层探空、和风天气地面观测与大气光路物理推算，覆盖郑州及周边 150&nbsp;km 的观景指数预报。</p>
+    </header>
+
+    <section class="banner" aria-labelledby="bannerTitle">
+      <div class="banner-head">
+        <h2 id="bannerTitle">黄金窗口看点</h2>
+        <span class="hint" id="bannerHint">未来 3 天最佳日出 / 日落时段</span>
+      </div>
+      <div class="banner-scroll" id="bannerScroll">
+        <div class="skel" style="height:210px"></div>
+        <div class="skel" style="height:210px"></div>
+        <div class="skel" style="height:210px"></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="detailTitle" id="detailSection" class="detail-col">
+      <div class="section-head detail-head-row">
+        <div>
+          <h2 id="detailTitle">单点专业剖析</h2>
+          <p id="detailSubtitle">实战时刻轴与核心物理参数</p>
+        </div>
+        <div class="detail-selects">
+          <select id="timeSelect" class="spot-select-control" aria-label="切换时间"></select>
+          <select id="spotSelect" class="spot-select-control" aria-label="切换机位"></select>
+        </div>
+      </div>
+      <div class="detail-card side-detail-card" id="spotDetail"></div>
+    </section>
+
+    <section aria-labelledby="overviewTitle" id="overviewSection">
+      <div class="section-head">
+        <div>
+          <h2 id="overviewTitle">机位总览</h2>
+          <p>按机位名排序 · 点击查看单点剖析</p>
+        </div>
+        <span class="legend-note" id="overviewNote"></span>
+      </div>
+      <div class="ov-list" id="overviewList">
+        <div class="skel" style="height:220px"></div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="foot">
+        <div>
+          <div><strong style="color:var(--text-2)">Sky Forecast</strong> · 郑州及周边天空观景指数</div>
+          <div style="margin-top:4px">数据源：ECMWF (Open-Meteo) · 和风天气 QWeather · 大气光路物理推算</div>
+        </div>
+        <div style="text-align:right">
+          <div id="footUpdated">—</div>
+          <div style="margin-top:4px"><a href="data/forecast.json" target="_blank" rel="noopener">原始 JSON</a> · <a href="api/forecast" target="_blank" rel="noopener">实时 API</a></div>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    /* ------------------------------------------------------------------ *
+     * Helpers                                                             *
+     * ------------------------------------------------------------------ */
+    var $ = function (id) { return document.getElementById(id); };
+
+    function el(tag, cls, text) {
+      var node = document.createElement(tag);
+      if (cls) node.className = cls;
+      if (text != null) node.textContent = text;
+      return node;
+    }
+
+    function fmtUpdated(iso) {
+      if (!iso) return "—";
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+      return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
+        " " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + "（本地）";
+    }
+
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    /* Continuous colour ramps: fire clouds (yellow -> amber -> orange -> red ->
+       magenta -> purple) and sea of clouds (mist white -> cold cyan-blue). */
+    var STOPS = [
+      { v: 0, c: [255, 224, 102] },
+      { v: 20, c: [255, 214, 10] },
+      { v: 40, c: [255, 159, 10] },
+      { v: 60, c: [255, 55, 95] },
+      { v: 80, c: [191, 90, 242] },
+      { v: 100, c: [125, 42, 232] }
+    ];
+    function rampRGB(stops, v) {
+      v = clamp(v, 0, 100);
+      for (var i = 0; i < stops.length - 1; i++) {
+        var a = stops[i], b = stops[i + 1];
+        if (v <= b.v) {
+          var t = (v - a.v) / (b.v - a.v || 1);
+          return [
+            Math.round(a.c[0] + (b.c[0] - a.c[0]) * t),
+            Math.round(a.c[1] + (b.c[1] - a.c[1]) * t),
+            Math.round(a.c[2] + (b.c[2] - a.c[2]) * t)
+          ];
+        }
+      }
+      var last = stops[stops.length - 1].c;
+      return [last[0], last[1], last[2]];
+    }
+    function bciRGB(v) { return rampRGB(STOPS, v); }
+    function bciColor(v) { var c = bciRGB(v); return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; }
+
+    function num(x, d) { return (x == null || isNaN(x)) ? (d == null ? 0 : d) : +x; }
+
+    function nearestHourly(hourly) {
+      if (!hourly || !hourly.length) return null;
+      var now = Date.now();
+      var best = hourly[0], bestDiff = Infinity;
+      for (var i = 0; i < hourly.length; i++) {
+        var t = new Date(hourly[i].time).getTime();
+        var diff = Math.abs(t - now);
+        if (diff < bestDiff) { bestDiff = diff; best = hourly[i]; }
+      }
+      return best;
+    }
+
+    function toast(msg) {
+      var t = $("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      clearTimeout(toast._t);
+      toast._t = setTimeout(function () { t.classList.remove("show"); }, 2400);
+    }
+
+    /* ------------------------------------------------------------------ *
+     * State / theme                                                       *
+     * ------------------------------------------------------------------ */
+    var state = {
+      data: null, spots: [], selectedSpotId: null, selectedEventKey: null
+    };
+
+    var THEME_ORDER = ["auto", "light", "dark"];
+    function applyTheme(theme) {
+      document.documentElement.setAttribute("data-theme", theme);
+      try { localStorage.setItem("sf-theme", theme); } catch (e) {}
+      var icon = $("themeIcon");
+      if (icon) {
+        if (theme === "dark") {
+          icon.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+        } else if (theme === "light") {
+          icon.innerHTML = '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.4M12 19.6V22M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2 12h2.4M19.6 12H22M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/>';
+        } else {
+          icon.innerHTML = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+        }
+      }
+    }
+    function initTheme() {
+      var saved = "auto";
+      try { saved = localStorage.getItem("sf-theme") || "auto"; } catch (e) {}
+      applyTheme(saved);
+      $("themeBtn").addEventListener("click", function () {
+        var cur = document.documentElement.getAttribute("data-theme") || "auto";
+        var next = THEME_ORDER[(THEME_ORDER.indexOf(cur) + 1) % THEME_ORDER.length];
+        applyTheme(next);
+        toast("主题：" + (next === "auto" ? "跟随系统" : next === "light" ? "浅色" : "深色"));
+      });
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Header                                                              *
+     * ------------------------------------------------------------------ */
+    function renderHeader(data) {
+      var meta = data.meta || {};
+      var mock = meta.mock || meta.data_source === "mock";
+      $("brandSub").textContent = "更新于 " + fmtUpdated(meta.generated_at || data.updated_at) +
+        (mock ? " · 演示数据" : "");
+
+      var chips = $("srcChips");
+      chips.innerHTML = "";
+      var sources = [
+        { label: "ECMWF", on: meta.data_source === "open-meteo" },
+        { label: "QWeather", on: meta.ground_source === "qweather" },
+        { label: "物理光路推算", on: true }
+      ];
+      sources.forEach(function (s) {
+        var c = el("span", "chip");
+        var dot = el("span", "dot");
+        if (!s.on) { dot.style.background = "var(--text-3)"; dot.style.boxShadow = "none"; }
+        c.appendChild(dot);
+        c.appendChild(document.createTextNode(s.label));
+        chips.appendChild(c);
+      });
+
+      $("footUpdated").textContent = "数据时间 " + fmtUpdated(meta.generated_at || data.updated_at);
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Banner                                                             *
+     * ------------------------------------------------------------------ */
+    /* WCAG 相对亮度与对比度；用于给彩色底挑选可读前景色。 */
+    function relLum(c) {
+      var v = [c[0], c[1], c[2]].map(function (x) {
+        x = x / 255;
+        return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+    }
+    function contrastRatio(a, b) {
+      var l1 = relLum(a), l2 = relLum(b);
+      return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+    }
+    function mixRGB(c, target, t) {
+      return [
+        Math.round(c[0] + (target[0] - c[0]) * t),
+        Math.round(c[1] + (target[1] - c[1]) * t),
+        Math.round(c[2] + (target[2] - c[2]) * t)
+      ];
+    }
+    /* 在色阶底上挑字色：先选对比度更高的深/浅字；
+       若两者都不足 4.5:1（色阶 83–88 区间会出现），把底色朝所选字色方向最多提亮 6% 补足。 */
+    function readableOn(rgb) {
+      var white = [255, 255, 255], dark = [28, 28, 30];
+      var cw = contrastRatio(white, rgb), cd = contrastRatio(dark, rgb);
+      var useDark = cd >= cw;
+      var ink = useDark ? dark : white;
+      var bg = rgb.slice();
+      for (var k = 1; k <= 10 && contrastRatio(ink, bg) < 4.5; k++) {
+        bg = mixRGB(rgb, useDark ? white : [0, 0, 0], k * 0.006);
+      }
+      return { ink: useDark ? "#1c1c1e" : "#ffffff", bg: "rgb(" + bg[0] + "," + bg[1] + "," + bg[2] + ")" };
+    }
+    function indexPill(value) {
+      var pill = el("span", "index-pill");
+      var rgb = bciRGB(value);
+      var pick = readableOn(rgb);
+      pill.style.background = pick.bg;
+      pill.style.color = pick.ink;
+      pill.textContent = Math.round(value);
+      return pill;
+    }
+
+    var MEDALS = ["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"];
+
+    /* One ranked spot row inside a day card. */
+    function renderPick(rank, pick) {
+      var row = el("div", "slot");
+      row.appendChild(el("div", "slot-icon", MEDALS[rank] || String(rank + 1)));
+      var body = el("div", "slot-body");
+      body.appendChild(el("div", "slot-main", pick.spot.name + " \u00b7 " + pick.time));
+      body.appendChild(el("div", "slot-sub",
+        (pick.kind === "sunset" ? "\u843d\u65e5" : "\u65e5\u51fa") + " \u00b7 " +
+        (pick.bci_grade || "\u2014") + " \u00b7 BCI " + Math.round(pick.bci)));
+      row.appendChild(body);
+      row.appendChild(indexPill(pick.bci));
+      return row;
+    }
+
+    function renderBanner(data) {
+      var box = $("bannerScroll");
+      box.innerHTML = "";
+      var dates = forecastDates(data);
+      if (!dates.length) {
+        var e = el("div", "empty");
+        e.appendChild(el("div", "big", "\u2601\uFE0F"));
+        e.appendChild(el("div", null, "\u6682\u65e0\u53ef\u7528\u7a97\u53e3"));
+        box.appendChild(e);
+        return;
+      }
+
+      var spots = data.spots || [];
+      var peaks = spots.map(function (s) { return { spot: s, days: dayPeaks(s) }; });
+
+      var dayLists = dates.map(function (date) {
+        var list = [];
+        peaks.forEach(function (p) {
+          var pk = p.days[date];
+          if (!pk) return;
+          list.push({
+            spot: p.spot, bci: pk.bci, sci: pk.sci, kind: pk.kind,
+            bci_grade: pk.bci_grade, time: pk.time
+          });
+        });
+        list.sort(function (a, b) { return b.bci - a.bci; });
+        return { date: date, list: list.slice(0, 3) };
+      });
+
+      var bestOverall = -1;
+      dayLists.forEach(function (d) {
+        if (d.list.length && d.list[0].bci > bestOverall) bestOverall = d.list[0].bci;
+      });
+
+      dayLists.forEach(function (d) {
+        var card = el("article", "day-card");
+        var peak = d.list.length ? d.list[0].bci : -1;
+        if (peak >= 0 && Math.abs(peak - bestOverall) < 0.05) card.classList.add("golden");
+        var top = el("div", "day-top");
+        var dateWrap = el("div");
+        dateWrap.appendChild(el("span", "day-date", d.date.slice(5).replace("-", "\u6708") + "\u65e5"));
+        dateWrap.appendChild(el("span", "day-week", weekdayOf(d.date)));
+        top.appendChild(dateWrap);
+        if (peak >= 0 && Math.abs(peak - bestOverall) < 0.05) {
+          top.appendChild(el("span", "ribbon", "\u9ec4\u91d1\u7a97\u53e3"));
+        } else if (peak >= 60) {
+          top.appendChild(el("span", "ribbon", "\u503c\u5f97\u671f\u5f85"));
+        }
+        card.appendChild(top);
+        if (!d.list.length) {
+          card.appendChild(el("div", "slot-empty", "\u8be5\u65e5\u65e0\u6709\u6548\u7a97\u53e3"));
+        } else {
+          d.list.forEach(function (pick, i) { card.appendChild(renderPick(i, pick)); });
+        }
+        box.appendChild(card);
+      });
+    }
+
+    /* ------------------------------------------------------------------ *
+     * LOHUI-style decision / timeline / PRO analysis                      *
+     * ------------------------------------------------------------------ */
+    function fireVerdict(bci) {
+      if (bci >= 75) return { tone: "go", label: "冲 · 绝美火烧云" };
+      if (bci >= 55) return { tone: "wait", label: "蹲 · 值得一等" };
+      if (bci >= 35) return { tone: "wait", label: "备 · 观望待命" };
+      return { tone: "rest", label: "收脚架 · 安心休整" };
+    }
+    function seaVerdict(sci, status) {
+      if (sci >= 60 || (status && status.indexOf("俯瞰") >= 0)) return { tone: "go", label: "冲 · 云海翻涌" };
+      if (sci >= 35) return { tone: "wait", label: "蹲 · 云海可期" };
+      return { tone: "rest", label: "收脚架 · 安心休整" };
+    }
+    /* ------------------------------------------------------------------ *
+     * High-precision astronomical sunrise / sunset (minute-level).        *
+     * NOAA solar-position algorithm: equation of time + solar declination *
+     * with -0.833\u00B0 refraction-corrected horizon, local UTC+8 (120\u00B0E).   *
+     * ------------------------------------------------------------------ */
+    function calcSunTimes(lat, lon, dateObj) {
+      var d = new Date(dateObj.getTime());
+      var startOfYear = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      var dayOfYear = Math.floor((d - startOfYear) / 86400000) + 1;
+      var gamma = (2 * Math.PI / 365) * (dayOfYear - 1);
+      var eqtime = 229.18 * (0.000075 + 0.001868 * Math.cos(gamma) - 0.032077 * Math.sin(gamma)
+        - 0.014615 * Math.cos(2 * gamma) - 0.040849 * Math.sin(2 * gamma));
+      var decl = 0.006918 - 0.399912 * Math.cos(gamma) + 0.070257 * Math.sin(gamma)
+        - 0.006758 * Math.cos(2 * gamma) + 0.000907 * Math.sin(2 * gamma);
+      var latRad = lat * Math.PI / 180;
+      var cosHA = (Math.sin(-0.833 * Math.PI / 180) - Math.sin(latRad) * Math.sin(decl)) / (Math.cos(latRad) * Math.cos(decl));
+      if (cosHA > 1) cosHA = 1; if (cosHA < -1) cosHA = -1;
+      var haDeg = Math.acos(cosHA) * 180 / Math.PI;
+      var noonMin = 720 - 4 * lon - eqtime + 8 * 60;
+      var sunriseMin = noonMin - haDeg * 4;
+      var sunsetMin = noonMin + haDeg * 4;
+      return { sunriseMin: sunriseMin, sunsetMin: sunsetMin };
+    }
+    function formatMin(m) {
+      m = Math.round(m);
+      while (m < 0) m += 1440;
+      m = m % 1440;
+      var hh = Math.floor(m / 60);
+      var mm = m % 60;
+      return (hh < 10 ? "0" + hh : "" + hh) + ":" + (mm < 10 ? "0" + mm : "" + mm);
+    }
+
+    /* ---- Real sunrise / sunset events (minute precision, future only) ---- */
+    var DAY_LABELS = ["\u4eca\u5929", "\u660e\u5929", "\u540e\u5929"];
+
+    function pad2(n) { return (n < 10 ? "0" : "") + n; }
+
+    function ymdOf(d) {
+      return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+    }
+
+    function minutesOf(hhmm) {
+      var p = String(hhmm || "").split(":");
+      return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+    }
+
+    /* Enumerate the next 3 days of real sunrise / sunset instants.
+       Only events still in the future are returned (past ones are dropped). */
+    function buildEvents(spot) {
+      var out = [];
+      if (!spot || spot.lat == null || spot.lon == null) return out;
+      var now = new Date();
+      var nowMin = now.getHours() * 60 + now.getMinutes();
+      for (var d = 0; d < 3; d++) {
+        var day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d);
+        var noon = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0, 0);
+        var st = calcSunTimes(spot.lat, spot.lon, noon);
+        var defs = [
+          { kind: "sunrise", label: "\u65e5\u51fa", min: st.sunriseMin },
+          { kind: "sunset", label: "\u65e5\u843d", min: st.sunsetMin }
+        ];
+        for (var i = 0; i < defs.length; i++) {
+          var ev = defs[i];
+          if (d === 0 && ev.min <= nowMin) continue;
+          out.push({
+            id: ymdOf(day) + "|" + ev.kind,
+            date: ymdOf(day),
+            dayIndex: d,
+            dayLabel: DAY_LABELS[d],
+            kind: ev.kind,
+            kindLabel: ev.label,
+            minutes: ev.min,
+            time: formatMin(ev.min),
+            text: DAY_LABELS[d] + " \u00b7 " + ev.label + " " + formatMin(ev.min)
+          });
+        }
+      }
+      return out;
+    }
+
+    /* Nearest hourly sample to a real event instant, same local date. */
+    function hourlyAtEvent(spot, ev) {
+      var hours = (spot && spot.hourly) || [];
+      if (!hours.length || !ev) return null;
+      var best = null, bestDiff = Infinity;
+      for (var i = 0; i < hours.length; i++) {
+        var h = hours[i];
+        var t = (h.time_local || "").slice(0, 16);
+        if (t.slice(0, 10) !== ev.date) continue;
+        var diff = Math.abs(minutesOf(t.slice(11, 16)) - ev.minutes);
+        if (diff < bestDiff) { bestDiff = diff; best = h; }
+      }
+      return best || nearestHourly(hours);
+    }
+
+    /* Selected event for a spot; falls back to the nearest future event. */
+    function resolveEvent(spot) {
+      var events = buildEvents(spot);
+      if (!events.length) return null;
+      if (state.selectedEventKey) {
+        for (var i = 0; i < events.length; i++) {
+          if (events[i].id === state.selectedEventKey) return events[i];
+        }
+      }
+      return events[0];
+    }
+
+    /* Populate the time dropdown for the current spot (future events only). */
+    function renderTimeSelect(spot) {
+      var sel = $("timeSelect");
+      if (!sel) return null;
+      var events = buildEvents(spot);
+      sel.innerHTML = "";
+      if (!events.length) {
+        sel.disabled = true;
+        return null;
+      }
+      sel.disabled = false;
+      events.forEach(function (ev) {
+        var opt = document.createElement("option");
+        opt.value = ev.id;
+        opt.textContent = "\uD83D\uDCC5 " + ev.text;
+        sel.appendChild(opt);
+      });
+      var current = resolveEvent(spot);
+      if (current) {
+        state.selectedEventKey = current.id;
+        sel.value = current.id;
+      }
+      sel.onchange = function () {
+        state.selectedEventKey = sel.value;
+        var s = null;
+        (state.spots || []).forEach(function (x) {
+          if (x.id === state.selectedSpotId) s = x;
+        });
+        if (s) renderSpotDetail(s);
+      };
+      return current;
+    }
+
+    /* ---- Shared day aggregation (3 days, golden windows only) ---- */
+    var PINYIN_INITIAL = {
+      "\u767d": "B", "\u5b9d": "B", "\u8001": "L", "\u5357": "N",
+      "\u5d69": "S", "\u6850": "T", "\u4e94": "W", "\u90d1": "Z"
+    };
+
+    function initialOf(name) {
+      var ch = String(name || "").charAt(0);
+      return PINYIN_INITIAL[ch] || "#";
+    }
+
+    function weekdayOf(dateStr) {
+      var d = new Date(dateStr + "T12:00:00");
+      return "\u5468" + ["\u65e5", "\u4e00", "\u4e8c", "\u4e09", "\u56db", "\u4e94", "\u516d"][d.getDay()];
+    }
+
+    /* Real sunrise / sunset minute for a spot on a given local date. */
+    function eventMinutes(spot, dateStr, kind) {
+      var noon = new Date(dateStr + "T12:00:00");
+      var st = calcSunTimes(spot.lat, spot.lon, noon);
+      return kind === "sunrise" ? st.sunriseMin : st.sunsetMin;
+    }
+
+    /* Per-day best golden-window sample for one spot. */
+    function dayPeaks(spot) {
+      var out = {};
+      (spot.hourly || []).forEach(function (h) {
+        var e = h.sun_elevation;
+        if (e == null || e < -5 || e > 8) return;
+        var date = (h.time_local || "").slice(0, 10);
+        if (!date) return;
+        var kind = (h.sun_hour_angle || 0) > 0 ? "sunset" : "sunrise";
+        var cur = out[date];
+        if (!cur || num(h.bci) > cur.bci) {
+          out[date] = {
+            date: date, kind: kind, bci: num(h.bci), sci: num(h.sci),
+            bci_grade: h.bci_grade || "",
+            cloud_high: h.cloud_high, cloud_low: h.cloud_low,
+            visibility_km: h.visibility_km, inversion_height_m: h.inversion_height_m,
+            time: formatMin(eventMinutes(spot, date, kind))
+          };
+        }
+      });
+      return out;
+    }
+
+    /* 所选事件那一刻的单点读数。
+       与 PRO 宫格同源（hourlyAtEvent + resolveEvent），
+       保证同一屏上下所有数字都指向同一个时刻。 */
+    function eventPeaks(spot) {
+      var ev = resolveEvent(spot);
+      var row = hourlyAtEvent(spot, ev);
+      if (!row) {
+        var near = nearestHourly(spot && spot.hourly);
+        return {
+          ev: ev, row: near,
+          bci: near && near.bci != null ? num(near.bci) : 0,
+          sci: near && near.sci != null ? num(near.sci) : 0,
+          isFire: true, lead: near && near.bci != null ? num(near.bci) : 0,
+          date: ev ? ev.date : "", time: ev ? ev.time : ""
+        };
+      }
+      var bciVal = row.bci != null ? num(row.bci) : 0;
+      var sciVal = row.sci != null ? num(row.sci) : 0;
+      return {
+        ev: ev, row: row,
+        bci: bciVal, sci: sciVal,
+        isFire: bciVal >= sciVal,
+        lead: bciVal >= sciVal ? bciVal : sciVal,
+        date: ev && ev.date ? ev.date : (row.time_local || "").slice(0, 10),
+        time: ev && ev.time ? ev.time : (row.time_local || "").slice(11, 16)
+      };
+    }
+
+    /* 三日窗口内 BCI / SCI 各自的峰值（统一口径）。
+       口径与 dayPeaks 一致：仅统计 sun_elevation ∈ [-5, 8] 的日出日落样本。 */
+    function windowPeaks(spot) {
+      var per = {};
+      (spot && spot.hourly || []).forEach(function (h) {
+        var e = h.sun_elevation;
+        if (e == null || e < -5 || e > 8) return;
+        var date = (h.time_local || "").slice(0, 10);
+        if (!date) return;
+        var r = per[date] || (per[date] = { bci: null, sci: null });
+        if (h.bci != null && (!r.bci || h.bci > r.bci.bci)) r.bci = h;
+        if (h.sci != null && (!r.sci || h.sci > r.sci.sci)) r.sci = h;
+      });
+      var dates = Object.keys(per).sort().slice(0, 3);
+      var pick = function (key) {
+        var best = null, bestDate = "";
+        dates.forEach(function (d) {
+          var r = per[d][key];
+          if (r && (!best || r[key] > best[key])) { best = r; bestDate = d; }
+        });
+        return { row: best, date: bestDate };
+      };
+      var b = pick("bci"), s = pick("sci");
+      var bciVal = b.row ? num(b.row.bci) : 0;
+      var sciVal = s.row ? num(s.row.sci) : 0;
+      return {
+        bci: bciVal, bciDate: b.date, bciRow: b.row,
+        sci: sciVal, sciDate: s.date, sciRow: s.row,
+        isFire: bciVal >= sciVal,
+        lead: bciVal >= sciVal ? bciVal : sciVal
+      };
+    }
+
+    /* 三日中「当日峰值 ≥ 35」的天数。
+       35 与 fireVerdict / seaVerdict 的「备 / 蹲」分界同源：
+       0 天必然对应「收脚架」，3 天必然对应「蹲」或「冲」，因此与决断标签不会冲突。 */
+    function stableDays(spot, key) {
+      var per = {};
+      (spot && spot.hourly || []).forEach(function (h) {
+        var e = h.sun_elevation;
+        if (e == null || e < -5 || e > 8) return;
+        var d = (h.time_local || "").slice(0, 10);
+        if (!d) return;
+        if (h[key] != null && (per[d] == null || h[key] > per[d])) per[d] = h[key];
+      });
+      var dates = Object.keys(per).sort().slice(0, 3);
+      var ok = 0;
+      /* 与展示同口径：先取整再比 35，避免「显示 35 分却算作未达标」。 */
+      dates.forEach(function (d) { if (Math.round(num(per[d])) >= 35) ok++; });
+      return { days: ok, total: dates.length };
+    }
+
+    /* Next 3 local dates present in the dataset. */
+    function forecastDates(data) {
+      var seen = {};
+      (data.spots || []).forEach(function (s) {
+        (s.hourly || []).forEach(function (h) {
+          var d = (h.time_local || "").slice(0, 10);
+          if (d) seen[d] = 1;
+        });
+      });
+      return Object.keys(seen).sort().slice(0, 3);
+    }
+
+    function buildTimeline(spot) {
+      if (!spot || spot.lat == null || spot.lon == null) return [];
+      var ev = resolveEvent(spot);
+      if (!ev) return [];
+      var dayObj = new Date(ev.date + "T12:00:00");
+      var st = calcSunTimes(spot.lat, spot.lon, dayObj);
+      var items = [];
+      if (ev.kind === "sunrise") {
+        items.push({ t: formatMin(st.sunriseMin - 24), label: "蓝调时刻", icon: "\uD83C\uDF06", tone: "blue", desc: "破晓前冷蓝" });
+        items.push({ t: formatMin(st.sunriseMin - 10), label: "晨光破晓", icon: "\uD83C\uDF05", tone: "touch", desc: "东方露白" });
+        items.push({ t: formatMin(st.sunriseMin), label: "日出触地", icon: "\uD83D\uDD25", tone: "peak", desc: "第一缕晨光" });
+        items.push({ t: formatMin(st.sunriseMin + 20), label: "黄金时刻", icon: "\u2728", tone: "golden", desc: "金黄侧逆光" });
+      } else {
+        items.push({ t: formatMin(st.sunsetMin - 30), label: "黄金时刻", icon: "\u2728", tone: "golden", desc: "侧逆光暖调" });
+        items.push({ t: formatMin(st.sunsetMin), label: "日落触地", icon: "\uD83C\uDF05", tone: "touch", desc: "太阳落入地平线" });
+        items.push({ t: formatMin(st.sunsetMin + 8), label: "点燃巅峰", icon: "\uD83D\uDD25", tone: "peak", desc: "核心爆发期 约9分钟" });
+        items.push({ t: formatMin(st.sunsetMin + 24), label: "蓝调时刻", icon: "\uD83C\uDF06", tone: "blue", desc: "深蓝冷暖反差" });
+      }
+      return items;
+    }
+
+    function toneColor(v, hi, mid, lo) {
+      if (v >= hi) return "var(--good)";
+      if (v >= mid) return "var(--fair)";
+      return lo == null ? "var(--bad)" : lo;
+    }
+
+    function toneInk(v, hi, mid, lo) {
+      if (v >= hi) return "var(--good-ink)";
+      if (v >= mid) return "var(--fair-ink)";
+      return lo == null ? "var(--bad-ink)" : lo;
+    }
+
+    /* 平滑阶跃，与原 Python _smoothstep 同口径（前端仅用于文案分档提示）。 */
+    function smoothstep(e0, e1, x) {
+      if (e0 === e1) return x < e0 ? 0 : 1;
+      var t = clamp((x - e0) / (e1 - e0), 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+    /* 太阳掠射闸门，对齐 core/physics/burning_cloud.py::_sun_score。 */
+    function sunScore(e) {
+      if (e == null) return 0.5;
+      if (e <= -2.0) return 0.03 + 0.97 * smoothstep(-12.0, -2.0, e);
+      if (e <= 6.0) return 1.0;
+      return 1.0 - 0.95 * smoothstep(6.0, 26.0, e);
+    }
+    /* 中高云画布质量，对齐 core/physics/burning_cloud.py::cloud_canvas（仅用于 bci_components 缺失时兜底）。 */
+    function canvasQuality(mid, high) {
+      var qh = 0.92 * Math.exp(-Math.pow((high - 58.0) / 38.0, 2));
+      qh *= 1 - 0.75 * smoothstep(85.0, 118.0, high);
+      var presence = smoothstep(3.0, 18.0, mid);
+      var qm = 0.92 * Math.exp(-Math.pow((mid - 30.0) / 32.0, 2));
+      qm *= (1 - 0.85 * smoothstep(45.0, 82.0, mid)) * presence;
+      qm *= 0.55 + 0.45 * smoothstep(0.0, 40.0, high);
+      var midVeil = 1 - 0.80 * smoothstep(30.0, 85.0, mid);
+      return Math.max(0.01, Math.max(qh * midVeil, qm));
+    }
+
+    /* 8-cell core PRO physics breakdown, all null-safe. */
+    function buildProCells(spot) {
+      var cur = nearestHourly(spot.hourly) || {};
+      var be = hourlyAtEvent(spot, resolveEvent(spot)) || spot.best_evening || spot.best_sunrise || {};
+      var h = be || {};
+      var src = {};
+      ["cloud_low", "cloud_mid", "cloud_high", "visibility_km"]
+        .forEach(function (k) { src[k] = (h[k] != null ? h[k] : cur[k]); });
+      var vis = num(src.visibility_km, 15);
+      var cl = num(src.cloud_low), cm = num(src.cloud_mid), ch = num(src.cloud_high);
+      var dir = (spot.orientation && spot.orientation.primary) || "W";
+      var corridor = Math.round(clamp(100 - 0.5 * cm - 0.18 * cl + (vis - 12) * 1.6, 0, 100));
+
+      var e = h.sun_elevation != null ? num(h.sun_elevation)
+        : (cur.sun_elevation != null ? num(cur.sun_elevation) : null);
+      var spct = Math.round(sunScore(e) * 100);
+      var sunG = e == null ? "无高度记录"
+        : e <= -12 ? "太阳已落深"
+        : e <= -6 ? "余晖微弱"
+        : e <= -2 ? "贴地平线"
+        : e <= 2 ? "掠射峰值"
+        : e <= 6 ? "低角度暖光"
+        : e <= 26 ? "光线上抬转白"
+        : "白光冲淡";
+
+      var bc = h.bci_components || null;
+      var cloud = bc && bc.cloud != null ? num(bc.cloud) : canvasQuality(cm, ch);
+      var cloudPct = clamp(cloud * 100, 0, 100);
+
+      var sunAz = h.sun_azimuth != null ? num(h.sun_azimuth)
+        : (cur.sun_azimuth != null ? num(cur.sun_azimuth) : null);
+      var orientAz = spot.orientation && spot.orientation.azimuth_deg != null
+        ? num(spot.orientation.azimuth_deg) : null;
+      var dAz = null;
+      if (sunAz != null && orientAz != null) {
+        dAz = Math.abs(sunAz - orientAz);
+        if (dAz > 180) dAz = 360 - dAz;
+      }
+      var dAzG = dAz == null ? "无朝向记录"
+        : dAz <= 20 ? "正对光路"
+        : dAz <= 45 ? "轻微偏移"
+        : dAz <= 90 ? "侧光取景"
+        : "背向光路";
+      var dAzPct = dAz == null ? 0 : Math.round(clamp(100 - dAz / 1.8, 0, 100));
+
+      return [
+        {
+          k: "太阳高度角", icon: "☀️", v: e == null ? "—" : e.toFixed(1), unit: e == null ? "" : "°",
+          g: sunG, pct: spct,
+          c: toneColor(spct, 70, 45),
+          ink: toneInk(spct, 70, 45)
+        },
+        {
+          k: "画布质量", icon: "🎨", v: String(Math.round(cloud * 100)), unit: "分",
+          g: cloud * 100 >= 70 ? "优质透光画布" : cloud * 100 >= 45 ? "可用画布" : cloud * 100 >= 25 ? "画布偏薄" : "几乎无画布",
+          pct: cloudPct,
+          c: toneColor(cloudPct, 70, 45),
+          ink: toneInk(cloudPct, 70, 45)
+        },
+        {
+          k: "进光廊道", icon: "🛣️", v: String(corridor), unit: "%",
+          g: dir + "向 · " + (corridor >= 70 ? "通畅" : corridor >= 45 ? "局部遮挡" : "受阻"),
+          pct: corridor,
+          c: toneColor(corridor, 70, 45),
+          ink: toneInk(corridor, 70, 45)
+        },
+        {
+          k: "落位偏差", icon: "🧭", v: dAz == null ? "—" : String(Math.round(dAz)), unit: dAz == null ? "" : "°",
+          g: dAzG, pct: dAzPct,
+          c: toneColor(dAzPct, 70, 45),
+          ink: toneInk(dAzPct, 70, 45)
+        },
+        {
+          k: "高空卷云", icon: "🌤️", v: String(Math.round(ch)), unit: "%",
+          g: ch >= 85 ? "死白无光" : ch >= 30 ? "散布适中" : "晴空无幕", pct: clamp(ch, 0, 100),
+          c: ch >= 85 ? "var(--bad)" : ch >= 30 ? "var(--good)" : "var(--fair)",
+          ink: ch >= 85 ? "var(--bad-ink)" : ch >= 30 ? "var(--good-ink)"
+            : toneInk(ch, 30, -1, "var(--fair-ink)")
+        },
+        {
+          k: "中云灰幕", icon: "🌫️", v: String(Math.round(cm)), unit: "%",
+          g: cm > 70 && ch < 50 ? "灰板挡光" : cm > 70 ? "厚云压光" : cm >= 30 ? "承接掠射" : "稀薄无害",
+          pct: clamp(100 - cm, 0, 100),
+          c: cm > 70 ? "var(--bad)" : toneColor(100 - cm, 70, 45),
+          ink: cm > 70 ? "var(--bad-ink)" : toneInk(100 - cm, 70, 45)
+        },
+        {
+          k: "本地低云", icon: "☁️", v: String(Math.round(cl)), unit: "%",
+          g: cl <= 25 ? "通透安全" : cl <= 50 ? "低空微遮" : "低云黑墙", pct: clamp(100 - cl, 0, 100),
+          c: toneColor(100 - cl, 75, 50),
+          ink: toneInk(100 - cl, 75, 50)
+        },
+        {
+          k: "大气能见度", icon: "🔭", v: String(Math.round(vis)), unit: "km",
+          g: vis >= 20 ? "通透水晶" : vis >= 10 ? "视线良好" : "轻雾遮蔽", pct: clamp(vis * 3.3, 0, 100),
+          c: toneColor(vis, 20, 10),
+          ink: toneInk(vis, 20, 10)
+        }
+      ];
+    }
+
+    /* 出工胜算 + 逆温/风速：填充左栏底部，用于判断这一趟值不值得跑。
+       win = hourlyAtEvent(spot, ev)，已由 renderSpotDetail 算好传入。 */
+    function confBlock(stab, win, wp, isFire) {
+      var spot = null;
+      (state.spots || []).forEach(function (s) {
+        if (!spot && s.id === state.selectedSpotId) spot = s;
+      });
+      var leadVal = wp ? wp.lead : 0;
+      var block = el("div", "panel-block");
+      block.appendChild(el("div", "pb-title", "🎯 出工胜算"));
+      var row = el("div", "conf-row");
+
+      var days = stab ? stab.days : null;
+      var total = stab ? stab.total : 3;
+      var pct = days == null || !total ? 0 : Math.round(days / total * 100);
+      var c1 = el("div", "conf-cell");
+      c1.appendChild(el("div", "ck", "🎯 三日达标"));
+      var v1 = el("div", "cv");
+      if (days == null) v1.textContent = "—";
+      else v1.innerHTML = days + "<small> / " + total + " 天</small>";
+      c1.appendChild(v1);
+      var dayBest = null;
+      (spot.hourly || []).forEach(function (h) {
+        var e0 = h.sun_elevation;
+        if (e0 == null || e0 < -5 || e0 > 8) return;
+        if ((h.time_local || "").slice(0, 10) !== (wp.date || "")) return;
+        var v0 = isFire ? h.bci : h.sci;
+        if (v0 != null && (dayBest == null || num(v0) > dayBest)) dayBest = num(v0);
+      });
+      c1.appendChild(el("div", "cg", days == null || dayBest == null
+        ? "无窗口数据"
+        : "此刻 " + Math.round(leadVal) + " · 当日峰 " + Math.round(dayBest)));
+      var bar = el("div", "conf-bar");
+      var bi = el("i");
+      bi.style.width = clamp(pct, 0, 100) + "%";
+      bi.style.background = days == null ? "var(--text-3)"
+        : days >= 3 ? "var(--good)" : days === 2 ? "var(--fair)" : "var(--bad)";
+      bar.appendChild(bi);
+      c1.appendChild(bar);
+      row.appendChild(c1);
+
+      var h = win || {};
+      var inv = h.inversion_strength != null ? num(h.inversion_strength) : null;
+      var invH = h.inversion_height_m != null ? num(h.inversion_height_m) : null;
+      var c2 = el("div", "conf-cell");
+      c2.appendChild(el("div", "ck", "\uD83C\uDF2B\uFE0F \u9006\u6E29\u5F3A\u5EA6"));
+      var v2 = el("div", "cv");
+      if (inv == null) v2.textContent = "\u2014";
+      else v2.innerHTML = inv.toFixed(1) + "<small> \u2103</small>";
+      c2.appendChild(v2);
+      c2.appendChild(el("div", "cg", inv == null ? "\u65E0\u9006\u6E29\u8BB0\u5F55"
+        : inv >= 3 ? "\u5F3A\u9006\u6E29 \u00B7 \u4E91\u6D77\u53EF\u671F"
+        : inv >= 1.5 ? "\u5F31\u9006\u6E29 \u00B7 \u5C40\u90E8\u6210\u5C42"
+        : "\u65E0\u660E\u663E\u9006\u6E29"));
+      if (invH != null) c2.appendChild(el("div", "cg", "\u9876\u5C42 " + Math.round(invH) + " m"));
+      row.appendChild(c2);
+
+      var wind = h.wind_speed_10m != null ? num(h.wind_speed_10m) : null;
+      var c3 = el("div", "conf-cell");
+      c3.appendChild(el("div", "ck", "\uD83D\uDCA8 \u5730\u9762\u98CE\u901F"));
+      var v3 = el("div", "cv");
+      if (wind == null) v3.textContent = "\u2014";
+      else v3.innerHTML = wind.toFixed(1) + "<small> m/s</small>";
+      c3.appendChild(v3);
+      c3.appendChild(el("div", "cg", wind == null ? "\u65E0\u98CE\u901F\u8BB0\u5F55"
+        : wind <= 3 ? "\u9759\u98CE \u00B7 \u4E09\u811A\u67B6\u7A33"
+        : wind <= 6 ? "\u5FAE\u98CE \u00B7 \u53EF\u6301\u7A33"
+        : wind <= 10 ? "\u5927\u98CE \u00B7 \u6CE8\u610F\u6296\u52A8"
+        : "\u5F3A\u98CE \u00B7 \u614E\u62CD\u957F\u66DD"));
+      row.appendChild(c3);
+
+      block.appendChild(row);
+      return block;
+    }
+
+    function proGridBlock(title, tagText, cells) {
+      var block = el("div", "panel-block");
+      var t = el("div", "pb-title");
+      t.appendChild(document.createTextNode(title));
+      if (tagText) t.appendChild(el("span", "tag", tagText));
+      block.appendChild(t);
+      var grid = el("div", "pro-grid");
+      cells.forEach(function (c) {
+        var cell = el("div", "pro-cell");
+        cell.appendChild(el("div", "pro-k", c.icon + " " + c.k));
+        var v = el("div", "pro-v");
+        var b = el("b", null, c.v);
+        if (c.ink) b.style.color = c.ink;
+        v.appendChild(b);
+        var em = el("em", null, c.unit ? c.unit + (c.g ? " · " + c.g : "") : c.g);
+        v.appendChild(em);
+        cell.appendChild(v);
+        if (c.pct != null) {
+          var bar = el("div", "pro-bar");
+          var i = el("i");
+          i.style.width = clamp(c.pct, 0, 100) + "%";
+          i.style.background = c.c || "var(--accent)";
+          bar.appendChild(i);
+          cell.appendChild(bar);
+        }
+        grid.appendChild(cell);
+      });
+      block.appendChild(grid);
+      return block;
+    }
+
+    function timelineBlock(spot) {
+      var items = buildTimeline(spot);
+      if (items.length < 2) return null;
+      var ev = resolveEvent(spot);
+      var block = el("div", "panel-block");
+      block.appendChild(el("div", "pb-title", "\uD83D\uDCC5 出工实战时刻" + (ev ? " \u00b7 " + ev.text : "")));
+      var tl = el("div", "timeline");
+      items.forEach(function (it) {
+        var item = el("div", "tl-item");
+        var dot = el("div", "tl-dot " + it.tone, it.icon);
+        item.appendChild(dot);
+        item.appendChild(el("div", "tl-time", it.t));
+        item.appendChild(el("div", "tl-label", it.label));
+        item.appendChild(el("div", "tl-desc", it.desc));
+        tl.appendChild(item);
+      });
+      block.appendChild(tl);
+      return block;
+    }
+
+    function syncOverviewActive(id) {
+      var list = $("overviewList");
+      if (!list) return;
+      var rows = list.querySelectorAll(".ov-row");
+      if (!rows.length) return;
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        var on = row.dataset.spotId === id;
+        row.classList.toggle("is-active", on);
+        row.setAttribute("aria-pressed", on ? "true" : "false");
+      }
+    }
+
+    function renderOverview(data) {
+      var list = $("overviewList");
+      if (!list) return;
+      var spots = (data.spots || []).slice();
+      var dates = forecastDates(data);
+
+      spots.sort(function (a, b) {
+        var ia = initialOf(a.name), ib = initialOf(b.name);
+        if (ia !== ib) return ia < ib ? -1 : 1;
+        return String(a.name).localeCompare(String(b.name), "zh-Hans-CN");
+      });
+
+      list.innerHTML = "";
+      if (!spots.length) {
+        list.appendChild(el("div", "empty", "\u6682\u65e0\u53ef\u7528\u673a\u4f4d"));
+        return;
+      }
+
+      list.setAttribute("role", "group");
+      list.setAttribute("aria-label", "\u673a\u4f4d\u603b\u89c8\uff1a\u672a\u6765\u4e09\u5929\u65e5\u51fa\u65e5\u843d\u6307\u6570");
+
+      var head = el("div", "ov-head");
+      head.setAttribute("aria-hidden", "true");
+      head.appendChild(el("div", "ov-head-badge", ""));
+      head.appendChild(el("div", "ov-head-name", "\u673a\u4f4d"));
+      dates.forEach(function (date) {
+        var hc = el("div", "ov-day");
+        hc.appendChild(el("div", "d", date.slice(5).replace("-", "/")));
+        hc.appendChild(el("div", "w", weekdayOf(date)));
+        hc.appendChild(el("div", "u", "BCI \u00b7 \u4e91\u6d77"));
+        head.appendChild(hc);
+      });
+      list.appendChild(head);
+
+      spots.forEach(function (s) {
+        var days = dayPeaks(s);
+        var row = el("button", "ov-row");
+        row.type = "button";
+        row.dataset.spotId = s.id;
+        row.setAttribute("aria-pressed", "false");
+
+        var dayText = dates.map(function (date) {
+          var p = days[date];
+          if (!p || p.bci <= 0) return date.slice(5).replace("-", "/") + " \u65e0\u6570\u636e";
+          return date.slice(5).replace("-", "/") + " " + (p.kind === "sunset" ? "\u65e5\u843d" : "\u65e5\u51fa") +
+            " " + p.time + "\uff0c" + Math.round(p.bci) + "\u5206";
+        }).join("\uff1b");
+        row.setAttribute("aria-label", s.name + "\uff0c" + (s.region || "") + "\uff0c\u6d77\u62d4" +
+          num(s.elevation_m) + "\u7c73\uff1a" + dayText);
+        row.appendChild(el("div", "ov-badge", initialOf(s.name)));
+
+        var nameWrap = el("div", "ov-name");
+        nameWrap.appendChild(el("div", "n", s.name));
+        var meta = el("div", "m");
+        meta.appendChild(el("span", "region", (s.region || "\u2014") + " \u00b7 "));
+        meta.appendChild(document.createTextNode(num(s.elevation_m) + " m"));
+        nameWrap.appendChild(meta);
+
+        var dir = (s.orientation && s.orientation.primary) || "";
+        var focal = s.recommended_focal_length_mm;
+        var m2bits = [];
+        if (dir) m2bits.push(dir + "\u5411");
+        if (focal && focal.length === 2) m2bits.push(focal[0] + "-" + focal[1] + "mm");
+        if (m2bits.length) nameWrap.appendChild(el("div", "m2", m2bits.join(" \u00b7 ")));
+        row.appendChild(nameWrap);
+
+        dates.forEach(function (date) {
+          var pk = days[date];
+          var cell = el("div", "ov-day");
+          if (!pk || pk.bci <= 0) {
+            cell.classList.add("is-empty");
+            cell.appendChild(el("div", "s", "\u2014"));
+          } else {
+            var sc = el("div", "s");
+            sc.appendChild(document.createTextNode(pk.kind === "sunset" ? "\uD83C\uDF07" : "\uD83C\uDF05"));
+            sc.appendChild(el("b", null, String(Math.round(pk.bci))));
+            if (pk.bci_grade) sc.appendChild(el("em", null, pk.bci_grade));
+            cell.appendChild(sc);
+
+            var tline = el("div", "t", pk.time);
+            tline.appendChild(el("span", "k", pk.kind === "sunset" ? "\u843d" : "\u51fa"));
+            cell.appendChild(tline);
+
+            var sea = el("div", "ov-sea");
+            var sb = el("span", "sb");
+            var si = el("i");
+            var pct = clamp(Math.round(pk.bci), 0, 100);
+            si.style.width = Math.max(pct, 3) + "%";
+            si.style.background = bciColor(pk.bci);
+            sb.appendChild(si);
+            sea.appendChild(sb);
+            sea.appendChild(el("span", "sv", "\u4e91" + Math.round(pk.sci)));
+            cell.appendChild(sea);
+
+            cell.title = date + " \u00b7 " + (pk.kind === "sunset" ? "\u65e5\u843d" : "\u65e5\u51fa") +
+              " " + pk.time + " \u00b7 BCI " + Math.round(pk.bci) + " \u00b7 " + (pk.bci_grade || "\u2014") +
+              " \u00b7 \u4e91\u6d77 " + Math.round(pk.sci);
+          }
+          row.appendChild(cell);
+        });
+
+        row.addEventListener("click", function () {
+          selectSpot(s, false);
+          var sec = $("detailSection");
+          if (sec && sec.scrollIntoView) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+
+        list.appendChild(row);
+      });
+
+      if (state.selectedSpotId) syncOverviewActive(state.selectedSpotId);
+
+      var note = $("overviewNote");
+      if (note) note.textContent = spots.length + " 个机位 · 未来三天 · BCI 火烧云指数 / SCI 云海指数，满分 100，≥60 值得出门";
+    }
+
+    function gradePill(label, value, grade, color, dateStr) {
+      var p = el("span", "spot-grade");
+      var dot = el("span", "dot");
+      dot.style.background = color;
+      p.appendChild(dot);
+      p.appendChild(document.createTextNode(label + " "));
+      p.appendChild(el("b", null, String(value)));
+      if (grade) p.appendChild(document.createTextNode(" · " + grade));
+      if (dateStr) p.appendChild(el("span", "pill-date", dateStr.slice(5).replace("-", "/")));
+      return p;
+    }
+
+    /* Single-point deep dive: rendered once for the selected spot only. */
+    function renderSpotDetail(spot) {
+      var sec = $("detailSection"), box = $("spotDetail");
+      if (!sec || !box) return;
+      box.innerHTML = "";
+      sec.hidden = false;
+      if (!spot) {
+        box.appendChild(el("div", "detail-empty", "请在上方下拉框选择机位"));
+        return;
+      }
+
+      var status = spot.status || {};
+      var current = nearestHourly(spot.hourly);
+      var wp = eventPeaks(spot);
+      var isFire = wp.isFire;
+      var leadVal = wp.lead;
+      /* 展示与判定必须用同一个取整值，否则会出现「显示 35 分、判定收脚架」。 */
+      var leadShown = Math.round(leadVal);
+      var leadRow = wp.row;
+      var leadDate = wp.date;
+      var sciStatus = (wp.row && wp.row.sci_status) || status.peak_sci_status || "—";
+      var verdict = isFire ? fireVerdict(leadShown) : seaVerdict(leadShown, sciStatus);
+
+      // 1. 头部名牌 + 双指数
+      var head = el("div", "detail-head");
+      var nameWrap = el("div");
+      nameWrap.appendChild(el("div", "dh-name", spot.name));
+      nameWrap.appendChild(el("div", "dh-meta", "⛰️ " + spot.elevation_m + " m · " +
+        (spot.region || "") + " · " +
+        (status.weather_text || (spot.ground && spot.ground.text) || "—")));
+      var headGrades = el("div", "spot-grades");
+      headGrades.appendChild(gradePill("🔥 火烧云", Math.round(wp.bci),
+        (wp.row && wp.row.bci_grade) || "", bciColor(wp.bci)));
+      headGrades.appendChild(gradePill("☁️ 云海", Math.round(wp.sci), sciStatus, "#0a84ff"));
+      nameWrap.appendChild(headGrades);
+      head.appendChild(nameWrap);
+      head.appendChild(el("span", "decision-tag " + verdict.tone, verdict.label));
+      box.appendChild(head);
+
+      // 2. 出工决断 (紧凑条带模式，绝不膨胀占满全屏)
+      var ev = resolveEvent(spot);
+      var win = hourlyAtEvent(spot, ev) || (isFire ? (spot.best_evening || spot.best_morning || {}) : (spot.best_sea || {}));
+      var stab = stableDays(spot, isFire ? "bci" : "sci");
+      function pick(k) {
+        if (win && win[k] != null) return win[k];
+        if (current && current[k] != null) return current[k];
+        return null;
+      }
+
+      var decBlock = el("div", "panel-block");
+      decBlock.style.paddingTop = "10px";
+      decBlock.appendChild(el("div", "pb-title", "🎯 出工决断"));
+      
+      var decStrip = el("div", "compact-dec-strip " + verdict.tone);
+      var dsLeft = el("div", "cds-left");
+      dsLeft.innerHTML = '<b class="cds-tag">' + verdict.label + '</b>' +
+        '<span class="cds-score">' + (isFire ? "BCI " : "SCI ") + leadShown + '分</span>';
+      
+      function pickPct(k) {
+        var v = pick(k);
+        return v != null ? Math.round(num(v)) + "%" : "—";
+      }
+      var reasonsText = "中云" + pickPct("cloud_mid") + " · " +
+        "卷云" + pickPct("cloud_high") + " · " +
+        "低云" + pickPct("cloud_low") + " · " +
+        "能见度" + (pick("visibility_km") != null ? Math.round(pick("visibility_km")) + "km" : "—");
+      dsLeft.appendChild(el("div", "cds-reasons", reasonsText));
+      decStrip.appendChild(dsLeft);
+
+      if (ev) {
+        var dsRight = el("div", "cds-right");
+        dsRight.appendChild(el("span", "cds-prob",
+          (ev.kindLabel || "") + " " + ev.time));
+        dsRight.appendChild(el("span", "cds-cap", "· 所选时刻"));
+        decStrip.appendChild(dsRight);
+      }
+      decBlock.appendChild(decStrip);
+
+      var cols = el("div", "detail-cols");
+      var colL = el("div", "dcol dcol-left");
+      var colR = el("div", "dcol dcol-right");
+      colL.appendChild(decBlock);
+
+      // 3. 出工实战时刻 (4阶段时间轴)
+      var tl = timelineBlock(spot);
+      if (tl) colL.appendChild(tl);
+
+      // 3.5 出工胜算 + 逆温/风速
+      colL.appendChild(confBlock(stab, win, wp, isFire));
+
+      // 4. PRO 核心气象 (8宫格)
+      colR.appendChild(proGridBlock("⚙️ PRO 核心气象", "PRO", buildProCells(spot)));
+
+      cols.appendChild(colL);
+      cols.appendChild(colR);
+      box.appendChild(cols);
+
+      var sub = $("detailSubtitle");
+      if (sub) sub.textContent = "实战时刻轴与核心物理参数 · " + (spot.region || "—") + " · " + num(spot.elevation_m) + " m";
+    }
+
+    function selectSpot(spot, noScroll) {
+      if (!spot) return;
+      state.selectedSpotId = spot.id;
+      var sel = $("spotSelect");
+      if (sel && sel.value !== spot.id) sel.value = spot.id;
+      renderTimeSelect(spot);
+      renderSpotDetail(spot);
+      syncOverviewActive(spot.id);
+    }
+
+    function renderSpots(data) {
+      var spots = data.spots || [];
+      state.spots = spots;
+      var sel = $("spotSelect");
+      if (!sel) return;
+      sel.innerHTML = "";
+      if (!spots.length) {
+        renderSpotDetail(null);
+        return;
+      }
+      var bestSpot = spots[0];
+      var bestScore = -1;
+      spots.forEach(function (s) {
+        var opt = document.createElement("option");
+        opt.value = s.id;
+        var wps = windowPeaks(s);
+        var bci = wps.bci;
+        var sci = wps.sci;
+        var topScore = wps.lead;
+        var ico = wps.isFire ? "🔥" : "☁️";
+        /* 这里的分数是 windowPeaks 的三日最高，不随所选时刻变化；
+           必须写明「三日最高」，否则会和下方跟随时刻的面板分数打架。 */
+        opt.textContent = ico + " " + s.name + " (" + (s.region || "") + " · 三日最高 " +
+          Math.round(topScore) + "分)";
+        sel.appendChild(opt);
+        if (topScore > bestScore) {
+          bestScore = topScore;
+          bestSpot = s;
+        }
+      });
+      var initSpot = bestSpot;
+      if (state.selectedSpotId) {
+        var found = spots.find(function (s) { return s.id === state.selectedSpotId; });
+        if (found) initSpot = found;
+      }
+      sel.value = initSpot.id;
+      selectSpot(initSpot, true);
+      sel.onchange = function () {
+        var chosen = spots.find(function (s) { return s.id === sel.value; });
+        if (chosen) selectSpot(chosen, false);
+      };
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Data loading                                                        *
+     * ------------------------------------------------------------------ */
+    function setLoading(loading) {
+      var btn = $("refreshBtn");
+      if (btn) btn.classList.toggle("spin", !!loading);
+    }
+
+    function load(bust) {
+      setLoading(true);
+      var url = "data/forecast.json" + (bust ? "?t=" + Date.now() : "");
+      return fetch(url, { cache: bust ? "no-store" : "default" })
+        .then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          state.data = data;
+          renderHeader(data);
+          renderBanner(data);
+          renderSpots(data);
+          renderOverview(data);
+          if (bust) toast("数据已刷新 · " + fmtUpdated(data.meta && data.meta.generated_at));
+        })
+        .catch(function (err) {
+          console.error(err);
+          var box = $("bannerScroll");
+          box.innerHTML = "";
+          var e = el("div", "empty");
+          e.appendChild(el("div", "big", "\u26A0\uFE0F"));
+          e.appendChild(el("div", null, "数据加载失败：" + err.message));
+          box.appendChild(e);
+          if (bust) toast("刷新失败：" + err.message);
+        })
+        .then(function () { setLoading(false); });
+    }
+
+    function boot() {
+      initTheme();
+      $("refreshBtn").addEventListener("click", function () { load(true); });
+      load(false);
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", boot);
+    } else {
+      boot();
+    }
+  })();
+  </script>
+</body>
+</html>
