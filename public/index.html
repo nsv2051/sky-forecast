@@ -1242,7 +1242,7 @@
             kind: kind, time: time
           };
         }
-        if (h.sci != null && (!r.sci || num(h.sci) > r.sci.v)) {
+        if (h.sci != null && h.sci_observable !== false && (!r.sci || num(h.sci) > r.sci.v)) {
           r.sci = {
             v: num(h.sci), grade: "", status: h.sci_status || "",
             kind: kind, time: time
@@ -1275,7 +1275,7 @@
           slot.bci = num(h.bci);
           slot.grade = h.bci_grade || "";
         }
-        if (h.sci != null && (r.sci.value == null || num(h.sci) > r.sci.value)) {
+        if (h.sci != null && h.sci_observable !== false && (r.sci.value == null || num(h.sci) > r.sci.value)) {
           r.sci.value = num(h.sci);
           r.sci.time = (h.time_local || "").slice(11, 16);
         }
@@ -1328,7 +1328,7 @@
         if (!date) return;
         var r = per[date] || (per[date] = { bci: null, sci: null });
         if (h.bci != null && (!r.bci || h.bci > r.bci.bci)) r.bci = h;
-        if (h.sci != null && (!r.sci || h.sci > r.sci.sci)) r.sci = h;
+        if (h.sci != null && h.sci_observable !== false && (!r.sci || h.sci > r.sci.sci)) r.sci = h;
       });
       var dates = Object.keys(per).sort().slice(0, 3);
       var pick = function (key) {

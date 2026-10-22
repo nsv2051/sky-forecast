@@ -215,9 +215,48 @@ class TestSeaOfClouds(unittest.TestCase):
             {"height": 0, "temperature": 20.0, "relative_humidity": 95.0},
             {"height": 500, "temperature": 18.0, "relative_humidity": 96.0},
             {"height": 1000, "temperature": 12.0, "relative_humidity": 40.0},
+            {"height": 1200, "temperature": 15.0, "relative_humidity": 40.0},
         ]
         result = sea_of_clouds.compute_sci(profile, viewpoint_elevation=1000)
         self.assertEqual(result["status"], sea_of_clouds.STATUS_OVERLOOK)
+        self.assertGreater(result["inversion_strength"], 0)
+
+    def test_no_inversion_is_clear(self):
+        profile = [
+            {"height": 0, "temperature": 20.0, "relative_humidity": 95.0},
+            {"height": 500, "temperature": 17.0, "relative_humidity": 96.0},
+            {"height": 1000, "temperature": 14.0, "relative_humidity": 70.0},
+            {"height": 1500, "temperature": 10.0, "relative_humidity": 40.0},
+        ]
+        result = sea_of_clouds.compute_sci(profile, viewpoint_elevation=1200)
+        self.assertEqual(result["status"], sea_of_clouds.STATUS_CLEAR)
+        self.assertLessEqual(result["sci"], 10.0)
+
+    def test_split_layers_use_lowest_deck(self):
+        profile = [
+            {"height": 760, "temperature": 14.0, "relative_humidity": 95.0},
+            {"height": 850, "temperature": 13.0, "relative_humidity": 96.0},
+            {"height": 1000, "temperature": 12.0, "relative_humidity": 94.0},
+            {"height": 2000, "temperature": 6.0, "relative_humidity": 55.0},
+            {"height": 3100, "temperature": -2.0, "relative_humidity": 95.0},
+        ]
+        result = sea_of_clouds.compute_sci(profile, viewpoint_elevation=1101)
+        self.assertLessEqual(result["cloud_top"], 1100)
+        self.assertGreaterEqual(result["cloud_base"], 700)
+        self.assertLessEqual(result["cloud_base"], 800)
+
+    def test_dry_above_caps_score(self):
+        profile = [
+            {"height": 0, "temperature": 20.0, "relative_humidity": 95.0},
+            {"height": 500, "temperature": 17.0, "relative_humidity": 96.0},
+            {"height": 900, "temperature": 14.0, "relative_humidity": 94.0},
+            {"height": 1000, "temperature": 10.0, "relative_humidity": 80.0},
+            {"height": 1100, "temperature": 13.0, "relative_humidity": 95.0},
+            {"height": 1200, "temperature": 11.0, "relative_humidity": 96.0},
+            {"height": 1500, "temperature": 6.0, "relative_humidity": 92.0},
+        ]
+        result = sea_of_clouds.compute_sci(profile, viewpoint_elevation=1000)
+        self.assertEqual(result["status"], sea_of_clouds.STATUS_CLEAR)
 
 
 class TestConfigAndSecrets(unittest.TestCase):

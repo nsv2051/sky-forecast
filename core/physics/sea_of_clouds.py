@@ -42,6 +42,9 @@ __all__ = [
     "IDEAL_MARGIN_MIN",
     "IDEAL_MARGIN_MAX",
     "MOUNTAIN_MIN_ELEVATION",
+    "VIEWPOINT_MARGIN_MIN",
+    "MIN_INVERSION_STRENGTH",
+    "DRY_ABOVE_MAX",
     "is_mountain_viewpoint",
 ]
 
@@ -79,6 +82,12 @@ _W_DRY = 0.20
 
 _FLOOR = 0.03
 
+# 逆温硬门控：没有逆温或逆温太弱时只是普通低云/雾，不能算云海。
+MIN_INVERSION_STRENGTH = 0.5
+# 青龙 SEA_DRY_ABOVE_MAX：云顶之上平均 RH 达到该值说明整层饱和/阴天，
+# 没有干空气托底的"海面"，判无云海。
+DRY_ABOVE_MAX = 88.0
+
 # 青龙沉淀：真正的云海要求观景山峰海拔高出逆温层（云顶）150~600 m。
 # 云顶几乎贴着脚下（<150 m）看不到"海"；高出太多（>600 m）则云海被稀释，
 # 观感下降。平原/市区点位天然低于云顶，永远落在"云层在上方"而不得分。
@@ -86,6 +95,9 @@ IDEAL_MARGIN_MIN = 150.0
 IDEAL_MARGIN_MAX = 600.0
 # 高山点位海拔下限（米）：低于此高度视为平原/城区，不参与云海观海判定。
 MOUNTAIN_MIN_ELEVATION = 200.0
+# 对齐青龙 SEA_MARGIN_MIN：云顶距山顶不足 30 m（或高于山顶）时，
+# 人在云里/云上，不能算俯瞰云海。
+VIEWPOINT_MARGIN_MIN = 30.0
 
 
 def is_mountain_viewpoint(elevation_m: float) -> bool:
@@ -207,21 +219,43 @@ def detect_inversion(levels) -> dict | None:
     return best
 
 
-def _cloud_layer(levels) -> dict | None:
-    saturated = [
-        level
-        for level in levels
-        if (level["rh"] is not None and level["rh"] >= _SATURATED_RH)
-        or (
+def _cloud_layer(levels, viewpoint_elevation: float | None = None) -> dict | None:
+    """Return the highest continuous saturated deck below the viewpoint.
+
+    连续饱和段之间只要夹着一个不饱和层就断开，不能把地面湿层和高空湿层
+    粘成一片假云。传入 ``viewpoint_elevation`` 时，云顶贴近或高于山顶的段
+    一律丢弃（人在云里/云上，不是看海），再取剩余段中云顶最高的一段。
+    """
+    segments = []
+    current = []
+    for level in levels:
+        saturated = (
+            level["rh"] is not None and level["rh"] >= _SATURATED_RH
+        ) or (
             level["dewpoint"] is not None
             and level["temperature"] - level["dewpoint"] <= _SATURATED_SPREAD
         )
-    ]
-    if not saturated:
+        if saturated:
+            current.append(level)
+        elif current:
+            segments.append(current)
+            current = []
+    if current:
+        segments.append(current)
+
+    if viewpoint_elevation is not None:
+        segments = [
+            segment
+            for segment in segments
+            if segment[-1]["height"] < viewpoint_elevation - VIEWPOINT_MARGIN_MIN
+        ]
+    if not segments:
         return None
-    base = saturated[0]["height"]
-    top = saturated[-1]["height"]
-    rh_values = [level["rh"] for level in saturated if level["rh"] is not None]
+
+    chosen = max(segments, key=lambda segment: segment[-1]["height"])
+    base = chosen[0]["height"]
+    top = chosen[-1]["height"]
+    rh_values = [level["rh"] for level in chosen if level["rh"] is not None]
     return {
         "base": base,
         "top": top,
@@ -280,25 +314,39 @@ def compute_sci(profile, viewpoint_elevation: float, wind_speed: float | None = 
     """
     levels = _normalise_profile(profile)
     inversion = detect_inversion(levels)
-    cloud = _cloud_layer(levels)
+    cloud = _cloud_layer(levels, viewpoint_elevation)
+    # 没有低于观景点的候选云层时，仍用完整廓线判断"云中/云下"，
+    # 但绝不据此判"俯瞰云海"，保持 IN_CLOUD / BELOW 的既有行为。
+    overlook_allowed = cloud is not None
+    if cloud is None:
+        cloud = _cloud_layer(levels)
     lcl = condensation_level(levels)
 
     inversion_strength = inversion["strength"] if inversion else 0.0
     inversion_height = inversion["base"] if inversion else None
+    rh_above = _mean_rh_above(levels, cloud["top"]) if cloud else None
 
     components = {}
     if cloud is None:
         status = STATUS_CLEAR
         sci = 5.0
         components["note"] = "无逆温、无饱和层"
-    elif viewpoint_elevation >= cloud["top"]:
+    elif inversion is None or inversion_strength < MIN_INVERSION_STRENGTH:
+        status = STATUS_CLEAR
+        sci = 5.0
+        components["note"] = "无封顶逆温"
+    elif rh_above is not None and rh_above >= DRY_ABOVE_MAX:
+        status = STATUS_CLEAR
+        sci = 5.0
+        components["note"] = "云顶之上整层饱和"
+    elif overlook_allowed and viewpoint_elevation >= cloud["top"]:
         status = STATUS_OVERLOOK
         margin = viewpoint_elevation - cloud["top"]
         sci, components = _overlook_score(
-            inversion_strength if inversion else 2.0,
+            inversion_strength,
             cloud["mean_rh"],
             margin,
-            _mean_rh_above(levels, cloud["top"]),
+            rh_above,
         )
         components["margin_m"] = round(margin, 1)
     elif viewpoint_elevation >= cloud["base"]:

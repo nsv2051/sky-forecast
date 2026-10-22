@@ -113,6 +113,16 @@ class TestPipelineOffline(unittest.TestCase):
             self.assertEqual(spot["best_sunset"], spot["best_evening"])
             self.assertEqual(spot["best_sunrise"], spot["best_morning"])
 
+    def test_sci_observable_flag(self):
+        found_true = False
+        for spot in self.forecast["spots"]:
+            for entry in spot["hourly"]:
+                self.assertIn("sci_observable", entry)
+                self.assertIsInstance(entry["sci_observable"], bool)
+                found_true = found_true or entry["sci_observable"]
+            self.assertIn("peak_sci_any_time", spot["status"])
+        self.assertTrue(found_true)
+
     def test_best_windows_are_sane(self):
         for spot in self.forecast["spots"]:
             best = spot["best_evening"]

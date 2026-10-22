@@ -37,6 +37,7 @@ __all__ = [
     "FORECAST_HOURS",
     "LOCAL_UTC_OFFSET_HOURS",
     "SNAPSHOT_DAY_COUNT",
+    "SEA_OBSERVABLE_HOURS",
     "GRID_BOUNDS",
     "GRID_STEP",
     "load_config",
@@ -81,6 +82,9 @@ GRID_STEP = 0.1
 _MORNING_ELEV = (-5.0, 8.0)
 _EVENING_ELEV = (-5.0, 8.0)
 _CLOUD_FIELDS = ("cloud_low", "cloud_mid", "cloud_high")
+
+# 云海可观测窗口：取自青龙 sunset_monitor 的印证时段（清晨 4-9 时、傍晚 16-19 时）。
+SEA_OBSERVABLE_HOURS = ((4, 9), (16, 19))
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +216,10 @@ def _ground_obs(ground, series, index):
 
 def _hourly_entry(spot: dict, series: HourlySeries, ground: GroundWeather, index: int) -> dict:
     instant = _parse_time(series.time[index])
+    local_hour = _local(instant).hour
+    sci_observable = any(
+        start <= local_hour <= end for start, end in SEA_OBSERVABLE_HOURS
+    )
     position = solar.solar_position(spot["lat"], spot["lon"], instant)
     visibility_km, aqi, ground_source = _ground_obs(ground, series, index)
 
@@ -245,6 +253,7 @@ def _hourly_entry(spot: dict, series: HourlySeries, ground: GroundWeather, index
         "sci": sci["sci"],
         "sci_status": sci["status"],
         "sci_state": sci["state"],
+        "sci_observable": sci_observable,
         "sci_components": sci["components"],
         "inversion_height_m": _round_or_none(sci.get("inversion_height")),
         "inversion_strength": sci.get("inversion_strength"),
@@ -398,7 +407,9 @@ def _orientation_advice(spot: dict, best_evening: dict | None, best_morning: dic
 
 def _spot_status(spot: dict, hourly: list, best_evening, best_morning, ground) -> dict:
     peak_bci = max(hourly, key=lambda item: item["bci"]) if hourly else None
-    peak_sci = max(hourly, key=lambda item: item["sci"]) if hourly else None
+    peak_sci_any = max(hourly, key=lambda item: item["sci"]) if hourly else None
+    observable = [entry for entry in hourly if entry.get("sci_observable")]
+    peak_sci = max(observable, key=lambda item: item["sci"]) if observable else None
     preferences = spot.get("preferences") or {}
     return {
         "burning_cloud_applicable": bool(preferences.get("burning_cloud", True)),
@@ -412,6 +423,8 @@ def _spot_status(spot: dict, hourly: list, best_evening, best_morning, ground) -
         "peak_sci_time_local": peak_sci["time_local"] if peak_sci else None,
         "peak_sci_cloud_top_m": peak_sci["cloud_top_m"] if peak_sci else None,
         "peak_sci_inversion_height_m": peak_sci["inversion_height_m"] if peak_sci else None,
+        "peak_sci_any_time": peak_sci_any["sci"] if peak_sci_any else None,
+        "peak_sci_any_time_local": peak_sci_any["time_local"] if peak_sci_any else None,
         "best_evening_grade": best_evening["bci_grade"] if best_evening else None,
         "best_morning_grade": best_morning["bci_grade"] if best_morning else None,
         "ground_source": ground.source,
@@ -422,7 +435,11 @@ def _spot_status(spot: dict, hourly: list, best_evening, best_morning, ground) -
 
 
 def _select_best_sea(hourly: list):
-    candidates = [entry for entry in hourly if entry.get("sci") is not None]
+    candidates = [
+        entry
+        for entry in hourly
+        if entry.get("sci") is not None and entry.get("sci_observable")
+    ]
     if not candidates:
         return None
     best = max(candidates, key=lambda item: item["sci"])
@@ -780,7 +797,10 @@ def _sea_highlight(entry: dict, spot_name: str) -> str:
 
 
 def _best_sea_of(pool):
-    spot, entry = max(pool, key=lambda item: item[1]["sci"])
+    candidates = [item for item in pool if item[1].get("sci_observable")]
+    if not candidates:
+        return None
+    spot, entry = max(candidates, key=lambda item: item[1]["sci"])
     return {
         "spot_id": spot["id"],
         "spot_name": spot["name"],
