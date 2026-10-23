@@ -116,7 +116,7 @@ data/livecam/
 | `in_window` | 该时刻是否处于日出日落窗口（05-08、17-20 点，含端点），布尔值。 |
 | `room_id` / `cam_name` | B 站房间号与机位名称。 |
 | `coord_note` | 坐标精度备注，`exact` 或 `approximate`。 |
-| `frame` | 帧文件路径、大小、MD5、尺寸及下述图像统计；失败时为 `null` 统计并带 `error`。 |
+| `frame` | 帧文件路径、大小、MD5、尺寸及下述图像统计；失败时为 `null` 统计并带 `error`。空帧同样保留真实统计，只是 `ok=false`、`blank=true`。 |
 | `forecast_at` | Open-Meteo 实际匹配到的小时。 |
 | `forecast` | 该小时的地面预报：温度、相对湿度、露点、低/中/高云量、能见度、风速、降水。 |
 | `prediction` | `compute_sci` 结果：`sci`、`status`、`state`、`inversion_height_m`、`components`；预测失败或模型导入失败时为 `null`。 |
@@ -138,8 +138,21 @@ data/livecam/
 | `bottom_mean_luma` | 画面下方 40% 区域的平均灰度。 |
 | `colorfulness` | 每个像素 RGB 三通道两两绝对差的均值的标准差，数值越大色彩越丰富。 |
 
-`frame` 还包含 `path`（相对输出根目录）、`ok`、`bytes`、`md5`、`width`、`height` 和
+`frame` 还包含 `path`（相对输出根目录）、`ok`、`blank`、`bytes`、`md5`、`width`、`height` 和
 `error`（成功时为 `null`）。
+
+### 空帧/均匀帧质量闸门
+
+抓帧成功不等于画面有效。采集器会用 `_image_stats` 算出的统计量做一次质量判定：
+
+- `std_luma < 1.0`：整幅均匀，涵盖纯黑、纯白、纯灰等死流/占位画面。
+- `mean_luma < 2.0`：近全黑画面。
+
+命中任一条件时 `frame.ok` 为 `false`、`frame.blank` 为 `true`、`frame.error` 为
+`"blank_frame"`，其余统计字段仍写入真实值，帧文件保留不删除，`errors` 中会追加
+`空帧: <path>`，并且本轮该机位计入失败。两个阈值是 `collect.py` 中的模块级常量
+`BLANK_STD_MIN` 与 `BLANK_MEAN_LUMA_MIN`。`report.py` 的帧成功率直接依据 `frame.ok`，
+因此空帧会被正确计为失败样本；历史台账不做回溯修改。
 
 ## 退出码
 

@@ -43,6 +43,10 @@ HTTP_TIMEOUT = 20.0
 FFMPEG_TIMEOUT = 25.0
 FFMPEG_RETRY_SLEEP = 3.0
 MAX_STREAM_FAILURES = 3
+# 空帧/均匀帧质量闸门：灰度标准差低于该值视为整幅均匀（纯黑/纯白/纯灰）。
+BLANK_STD_MIN = 1.0
+# 灰度均值低于该值视为近全黑（死流常见形态）。
+BLANK_MEAN_LUMA_MIN = 2.0
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -475,6 +479,7 @@ def _frame_failure(path: Path, out_dir: Path, error: str) -> dict[str, Any]:
     return {
         "path": str(relative),
         "ok": False,
+        "blank": False,
         "bytes": None,
         "md5": None,
         "width": None,
@@ -493,12 +498,27 @@ def _frame_failure(path: Path, out_dir: Path, error: str) -> dict[str, Any]:
     }
 
 
+def _frame_blank(stats: dict[str, Any]) -> str | None:
+    """判断帧是否为空帧/均匀帧；是则返回错误原因，否则返回 None。"""
+    std_luma = stats.get("std_luma")
+    mean_luma = stats.get("mean_luma")
+    if std_luma is None or mean_luma is None:
+        return None
+    if std_luma < BLANK_STD_MIN:
+        return "blank_frame"
+    if mean_luma < BLANK_MEAN_LUMA_MIN:
+        return "blank_frame"
+    return None
+
+
 def _frame_record(path: Path, out_dir: Path) -> dict[str, Any]:
     stats = _image_stats(path)
     relative = path.relative_to(out_dir) if path.is_relative_to(out_dir) else path
+    blank_reason = _frame_blank(stats)
     return {
         "path": str(relative),
-        "ok": True,
+        "ok": blank_reason is None,
+        "blank": blank_reason is not None,
         "bytes": stats["bytes"],
         "md5": stats["md5"],
         "width": stats["width"],
@@ -513,7 +533,7 @@ def _frame_record(path: Path, out_dir: Path) -> dict[str, Any]:
         "top_mean_luma": stats["top_mean_luma"],
         "bottom_mean_luma": stats["bottom_mean_luma"],
         "colorfulness": stats["colorfulness"],
-        "error": None,
+        "error": blank_reason,
     }
 
 
@@ -765,6 +785,10 @@ def _process_cam(
                 message = "帧统计失败: %s" % exc
                 errors.append(message)
                 frame = _frame_failure(frame_path, out_dir, message)
+            else:
+                if not frame.get("ok"):
+                    stream_ok = False
+                    errors.append("空帧: %s" % frame.get("path"))
 
     forecast_at: str | None = None
     forecast = _empty_forecast()
