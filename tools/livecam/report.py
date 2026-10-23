@@ -140,6 +140,13 @@ def _suspicious(record: dict[str, Any]) -> bool:
     )
 
 
+def _conflict(record: dict[str, Any]) -> bool:
+    column_cloud = record.get("column_cloud")
+    if not isinstance(column_cloud, dict):
+        return False
+    return bool(column_cloud.get("conflict"))
+
+
 def _distribution(records: list[dict[str, Any]]) -> str:
     counts = Counter(_status(record) for record in records)
     ordered = [status for status in STATUS_ORDER if counts.get(status)]
@@ -194,9 +201,10 @@ def main(argv: list[str] | None = None) -> int:
         grouped[key].append(record)
 
     print(
-        "机位\t样本\t帧成功率\t预测状态分布\t可疑组合"
+        "机位\t样本\t帧成功率\t预测状态分布\t可疑组合\t云量矛盾"
     )
     total_suspicious = 0
+    total_conflict = 0
     total_frame_ok = 0
     for room_id, cam_name in order:
         cam_records = grouped[(room_id, cam_name)]
@@ -207,23 +215,26 @@ def main(argv: list[str] | None = None) -> int:
             1 for record in cam_records if _suspicious(record)
         )
         total_suspicious += suspicious
+        conflict = sum(1 for record in cam_records if _conflict(record))
+        total_conflict += conflict
         rate = 100.0 * frame_ok / samples if samples else 0.0
         label = "%s (%s)" % (cam_name or "(未命名)", room_id)
         print(
-            "%s\t%d\t%.1f%%\t%s\t%d"
+            "%s\t%d\t%.1f%%\t%s\t%d\t%d"
             % (
                 label,
                 samples,
                 rate,
                 _distribution(cam_records),
                 suspicious,
+                conflict,
             )
         )
 
     rate = 100.0 * total_frame_ok / len(records) if records else 0.0
     print(
-        "合计\t%d\t%.1f%%\t-\t%d"
-        % (len(records), rate, total_suspicious)
+        "合计\t%d\t%.1f%%\t-\t%d\t%d"
+        % (len(records), rate, total_suspicious, total_conflict)
     )
     return 0
 

@@ -47,6 +47,18 @@ MAX_STREAM_FAILURES = 3
 BLANK_STD_MIN = 1.0
 # 灰度均值低于该值视为近全黑（死流常见形态）。
 BLANK_MEAN_LUMA_MIN = 2.0
+# 站点以上至少需要这么多层廓线，才足以判定云顶高度；不足时拒答而不是给默认值。
+MIN_LEVELS_ABOVE_VIEWPOINT = 2
+# 廓线层数不足时的状态/状态机取值。
+STATUS_INSUFFICIENT_PROFILE = "廓线不足"
+STATE_INSUFFICIENT_PROFILE = "insufficient_profile"
+# 低云量与画面亮度/对比度互相矛盾时的告警阈值（初版阈值，待真实样本标定）。
+LOW_CLOUD_CONFLICT_MIN = 80.0
+CONFLICT_BRIGHT_LUMA_MIN = 100.0
+CONFLICT_CONTRAST_STD_MIN = 50.0
+# 低云带的大致顶高；观景点高于该值时，低云带位于脚下，
+# "低云量高但画面通透"是云海信号而非矛盾。
+LOW_CLOUD_BAND_TOP_M = 2000.0
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -687,12 +699,105 @@ def _load_physics() -> Any:
     return module
 
 
+def _levels_above(
+    profile: list[dict[str, Any]] | None, elevation_m: float
+) -> int:
+    """统计廓线中位于站点海拔及以上的层数；缺 height 或非数值的层跳过。"""
+    count = 0
+    for layer in profile or []:
+        if not isinstance(layer, dict):
+            continue
+        height = layer.get("height")
+        try:
+            height_m = float(height)
+        except (TypeError, ValueError):
+            continue
+        if height_m >= elevation_m:
+            count += 1
+    return count
+
+
+def _column_cloud(
+    forecast: dict[str, Any],
+    frame: dict[str, Any] | None,
+    viewpoint_elevation: Any,
+) -> dict[str, Any]:
+    """汇总气柱低/中/高云量，并在低云量与画面观感严重矛盾时告警。
+
+    矛盾判定只在观景点低于低云带顶高时适用；高海拔机位的低云带位于脚下，
+    "低云量高但画面明亮通透"属于云海信号，不报矛盾。
+    """
+    source = forecast if isinstance(forecast, dict) else {}
+    low = _number(source.get("cloud_cover_low"), 1)
+    mid = _number(source.get("cloud_cover_mid"), 1)
+    high = _number(source.get("cloud_cover_high"), 1)
+    available = [value for value in (low, mid, high) if value is not None]
+    max_cover = max(available) if available else None
+
+    try:
+        elevation_m = (
+            None if viewpoint_elevation is None else float(viewpoint_elevation)
+        )
+    except (TypeError, ValueError):
+        elevation_m = None
+    conflict_applicable = (
+        elevation_m is not None and elevation_m < LOW_CLOUD_BAND_TOP_M
+    )
+
+    conflict = False
+    conflict_reason: str | None = None
+    if (
+        conflict_applicable
+        and low is not None
+        and low >= LOW_CLOUD_CONFLICT_MIN
+        and isinstance(frame, dict)
+        and frame.get("ok") is True
+    ):
+        try:
+            mean_luma = float(frame.get("mean_luma"))
+            std_luma = float(frame.get("std_luma"))
+        except (TypeError, ValueError):
+            mean_luma = std_luma = None
+        if (
+            mean_luma is not None
+            and mean_luma >= CONFLICT_BRIGHT_LUMA_MIN
+            and std_luma is not None
+            and std_luma >= CONFLICT_CONTRAST_STD_MIN
+        ):
+            conflict = True
+            conflict_reason = "低云量%.0f%%但画面明亮通透" % low
+
+    return {
+        "low": low,
+        "mid": mid,
+        "high": high,
+        "max_cover": max_cover,
+        "conflict": conflict,
+        "conflict_reason": conflict_reason,
+        "conflict_applicable": conflict_applicable,
+        "viewpoint_elevation_m": elevation_m,
+    }
+
+
 def _predict(
     physics_module: Any,
     cam: dict[str, Any],
     forecast: dict[str, Any],
     profile: list[dict[str, Any]],
 ) -> dict[str, Any]:
+    elevation = float(cam["elev_m"])
+    above = _levels_above(profile, elevation)
+    if above < MIN_LEVELS_ABOVE_VIEWPOINT:
+        return {
+            "sci": None,
+            "status": STATUS_INSUFFICIENT_PROFILE,
+            "state": STATE_INSUFFICIENT_PROFILE,
+            "inversion_height_m": None,
+            "components": {
+                "note": "站点以上仅 %d 层廓线，不足以判定云顶高度" % above,
+                "levels_above": above,
+            },
+        }
     visibility = forecast.get("visibility_m")
     temperature = forecast.get("temperature_2m")
     dew_point = forecast.get("dew_point_2m")
@@ -710,12 +815,15 @@ def _predict(
         ),
         dewpoint_spread=spread,
     )
+    components = result.get("components")
+    components = dict(components) if isinstance(components, dict) else {}
+    components["levels_above"] = above
     return {
         "sci": result.get("sci"),
         "status": result.get("status"),
         "state": result.get("state"),
         "inversion_height_m": result.get("inversion_height"),
-        "components": result.get("components") or {},
+        "components": components,
     }
 
 
@@ -807,6 +915,11 @@ def _process_cam(
         except Exception as exc:  # noqa: BLE001 - 预测失败写 null
             errors.append("预测失败: %s" % exc)
 
+    try:
+        viewpoint_elevation = float(cam["elev_m"])
+    except (KeyError, TypeError, ValueError):
+        viewpoint_elevation = None
+
     local = started_utc.astimezone(LOCAL_TZ)
     record = {
         "ts_utc": started_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -821,6 +934,7 @@ def _process_cam(
         "frame": frame,
         "forecast_at": forecast_at,
         "forecast": forecast,
+        "column_cloud": _column_cloud(forecast, frame, viewpoint_elevation),
         "prediction": prediction,
         "errors": errors,
     }
