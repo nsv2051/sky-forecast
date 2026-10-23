@@ -235,6 +235,91 @@ class TestGenerateScript(unittest.TestCase):
             self.assertTrue(data["meta"]["mock"])
 
 
+class TestFetchSeriesFailure(unittest.TestCase):
+    """真实抓取失败必须抛错，不能静默降级为 mock 数据。"""
+
+    class _BoomClient:
+        def fetch_hourly(self, *args, **kwargs):
+            raise RuntimeError("simulated outage")
+
+        def mock(self, *args, **kwargs):
+            return ["should-not-be-used"]
+
+    class _EmptyClient:
+        def fetch_hourly(self, *args, **kwargs):
+            return []
+
+        def mock(self, *args, **kwargs):
+            return ["should-not-be-used"]
+
+    class _MockClient:
+        def fetch_hourly(self, *args, **kwargs):
+            raise RuntimeError("live fetch must not run with --mock")
+
+        def mock(self, coordinates, *, hours, start, variables):
+            return mock_hourly(coordinates, hours=hours, start=start, variables=variables)
+
+    def test_live_failure_raises_open_meteo_error(self):
+        from core.pipeline import _fetch_series
+        from core.fetcher.open_meteo import OpenMeteoError
+
+        with self.assertRaises(OpenMeteoError):
+            _fetch_series(
+                self._BoomClient(),
+                [(34.0, 113.0)],
+                hours=4,
+                start=None,
+                variables=None,
+                force_mock=False,
+            )
+
+    def test_empty_response_raises_open_meteo_error(self):
+        from core.pipeline import _fetch_series
+        from core.fetcher.open_meteo import OpenMeteoError
+
+        with self.assertRaises(OpenMeteoError):
+            _fetch_series(
+                self._EmptyClient(),
+                [(34.0, 113.0)],
+                hours=4,
+                start=None,
+                variables=None,
+                force_mock=False,
+            )
+
+    def test_force_mock_still_returns_mock_series(self):
+        from core.pipeline import _fetch_series
+
+        series, source = _fetch_series(
+            self._MockClient(),
+            [(34.0, 113.0)],
+            hours=4,
+            start=START,
+            variables=None,
+            force_mock=True,
+        )
+        self.assertEqual(source, "mock")
+        self.assertTrue(series)
+        self.assertGreater(len(series[0]), 0)
+
+    def test_error_message_includes_original_failure(self):
+        from core.pipeline import _fetch_series
+        from core.fetcher.open_meteo import OpenMeteoError
+
+        with self.assertRaises(OpenMeteoError) as ctx:
+            _fetch_series(
+                self._BoomClient(),
+                [(34.0, 113.0)],
+                hours=4,
+                start=None,
+                variables=None,
+                force_mock=False,
+            )
+        message = str(ctx.exception)
+        self.assertIn("simulated outage", message)
+        self.assertIn("1 coordinates", message)
+
+
 def main():
     loader = unittest.TestLoader()
     suite = loader.loadTestsFromModule(sys.modules[__name__])

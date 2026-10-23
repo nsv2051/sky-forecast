@@ -212,6 +212,32 @@
   }
   .hero p { margin: 0; color: var(--text-2); font-size: 15px; max-width: 62ch; }
 
+  /* ---------------- Data notice ---------------- */
+  .data-notice {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2);
+    margin-top: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-left: 4px solid var(--text-3);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-size: 13.5px; line-height: 1.55;
+    max-width: 100%;
+  }
+  .data-notice[hidden] { display: none; }
+  .data-notice .data-notice-title { font-weight: 650; flex: 0 0 auto; }
+  .data-notice .data-notice-text { flex: 1 1 16ch; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+  .data-notice[data-level="warn"] {
+    border-left-color: var(--poor);
+    background: color-mix(in srgb, var(--poor) 10%, transparent);
+    color: var(--poor-ink);
+  }
+  .data-notice[data-level="alert"] {
+    border-left-color: var(--bad);
+    background: color-mix(in srgb, var(--bad) 9%, transparent);
+    color: var(--bad-ink);
+  }
+
   .banner { margin-top: var(--space-5); }
   .banner-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); flex-wrap: wrap; }
   .banner-head h2 { margin: 0; font-size: 20px; font-weight: 680; letter-spacing: -0.02em; }
@@ -700,6 +726,8 @@
       <p>基于 ECMWF 高空气压层探空、和风天气地面观测与大气光路物理推算，覆盖郑州及周边 150&nbsp;km 的观景指数预报。</p>
     </header>
 
+    <div id="dataNotice" class="data-notice" role="status" aria-live="polite" hidden></div>
+
     <section class="banner" aria-labelledby="bannerTitle">
       <div class="banner-head">
         <h2 id="bannerTitle">黄金窗口看点</h2>
@@ -870,11 +898,54 @@
     /* ------------------------------------------------------------------ *
      * Header                                                              *
      * ------------------------------------------------------------------ */
+    function renderDataNotice(data) {
+      var box = $("dataNotice");
+      if (!box) return;
+      var meta = (data && data.meta) || {};
+      var mock = meta.mock === true || meta.data_source === "mock";
+      var raw = meta.generated_at || (data && data.updated_at);
+      var ts = raw ? new Date(raw).getTime() : NaN;
+      var expired = false;
+      if (!isNaN(ts)) {
+        expired = (new Date().getTime() - ts) > 3 * 60 * 60 * 1000;
+      }
+
+      if (!mock && !expired) {
+        box.hidden = true;
+        box.textContent = "";
+        box.removeAttribute("data-level");
+        return;
+      }
+
+      var level = expired ? "alert" : "warn";
+      var title = "";
+      var text = "";
+      if (expired && mock) {
+        title = "演示数据已过期";
+        text = "当前为演示数据，由合成场生成，不代表真实预报，请勿据此安排行程；" +
+          "且数据已过期，最后生成于 " + fmtUpdated(raw) + "，后台自动更新可能已中断。";
+      } else if (expired) {
+        title = "数据已过期";
+        text = "数据已过期，最后生成于 " + fmtUpdated(raw) + "，后台自动更新可能已中断，请谨慎参考。";
+      } else {
+        title = "当前为演示数据";
+        text = "当前为演示数据，由合成场生成，不代表真实预报，请勿据此安排行程。";
+      }
+
+      box.hidden = false;
+      box.setAttribute("data-level", level);
+      box.textContent = "";
+      box.appendChild(el("strong", "data-notice-title", title));
+      box.appendChild(el("span", "data-notice-text", text));
+    }
+
     function renderHeader(data) {
       var meta = data.meta || {};
       var mock = meta.mock || meta.data_source === "mock";
       $("brandSub").textContent = "更新于 " + fmtUpdated(meta.generated_at || data.updated_at) +
         (mock ? " · 演示数据" : "");
+
+      renderDataNotice(data);
 
       var chips = $("srcChips");
       chips.innerHTML = "";

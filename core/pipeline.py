@@ -167,9 +167,9 @@ def _fetch_series(client, coordinates, *, hours, start, variables, force_mock):
 
     Live ECMWF data from Open-Meteo is the default and is labelled
     ``open-meteo-live``. ``--mock`` forces the deterministic offline generator
-    (``mock``); a genuine network failure degrades to ``mock_fallback`` so the
-    static build never hard-fails, but that state is always visible in
-    ``meta.data_source`` / ``meta.mock`` rather than being hidden.
+    (``mock``) and is the only entry point for synthetic data. A genuine
+    network or parse failure raises ``OpenMeteoError`` so the caller decides
+    how to fail; it never silently degrades to synthetic data.
     """
     if force_mock:
         return client.mock(coordinates, hours=hours, start=start, variables=variables), "mock"
@@ -180,8 +180,11 @@ def _fetch_series(client, coordinates, *, hours, start, variables, force_mock):
         if not series or all(len(item) == 0 for item in series):
             raise OpenMeteoError("empty open-meteo response")
         return series, "open-meteo-live"
-    except Exception:  # noqa: BLE001 - degrade to deterministic mock
-        return client.mock(coordinates, hours=hours, start=start, variables=variables), "mock_fallback"
+    except Exception as exc:  # noqa: BLE001 - surface the failure to the caller
+        raise OpenMeteoError(
+            "open-meteo fetch failed for %d coordinates: %s"
+            % (len(coordinates), exc)
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
