@@ -1,0 +1,44 @@
+{
+  "cams": [
+    {
+      "room_id": 1718159119,
+      "name": "浙江衢州常山·芳草地山顶酒店",
+      "lat": 29.1078,
+      "lon": 118.7136,
+      "elev_m": 1000,
+      "coord_note": "approximate"
+    },
+    {
+      "room_id": 23046729,
+      "name": "西藏林芝·索松村（面向南迦巴瓦）",
+      "lat": 29.5760,
+      "lon": 94.8906,
+      "elev_m": 3134,
+      "coord_note": "exact"
+    },
+    {
+      "room_id": 22194248,
+      "name": "中国国家地理·南迦巴瓦实景",
+      "lat": 29.6000,
+      "lon": 94.9000,
+      "elev_m": 3000,
+      "coord_note": "approximate"
+    },
+    {
+      "room_id": 24896254,
+      "name": "四川泸沽湖",
+      "lat": 27.7285,
+      "lon": 100.8540,
+      "elev_m": 2728,
+      "coord_note": "exact"
+    },
+    {
+      "room_id": 11235702,
+      "name": "山东济南·泉城广场",
+      "lat": 36.6683,
+      "lon": 116.9972,
+      "elev_m": 32,
+      "coord_note": "exact"
+    }
+  ]
+}
