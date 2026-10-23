@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""逐时采集 B 站慢直播画面与 Open-Meteo 预报，写入预测/实况对照台账。
+"""按 15 分钟时段采集 B 站慢直播画面与 Open-Meteo 预报，写入预测/实况对照台账。
 
-每个机位每小时抓取一张 JPEG 画面，同时拉取机位所在地的逐时预报，
-用仓库现有的海云指数物理模型算出预测值，并把两者写入同一行 JSONL。
+每个机位在同一个 15 分钟时段（slot）内只抓取一张 JPEG 画面，同时拉取机位所在地
+的逐时预报，用仓库现有的海云指数物理模型算出预测值，并把两者写入同一行 JSONL。
+日出日落窗口（05-08、17-20 点）可借助更密集的定时任务实现加密采集。
 
 所有 HTTP 请求与 ffmpeg 抓帧均强制直连，忽略 HTTP_PROXY / HTTPS_PROXY。
 """
@@ -104,7 +105,7 @@ PRESSURE_LEVELS = _load_pressure_levels()
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="逐时采集 B 站慢直播画面与 Open-Meteo 云海预测。"
+        description="按 15 分钟时段采集 B 站慢直播画面与 Open-Meteo 云海预测。"
     )
     parser.add_argument(
         "--out",
@@ -125,7 +126,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="覆盖同一小时已有记录",
+        help="覆盖同一 15 分钟时段已有记录",
     )
     parser.add_argument(
         "--check",
@@ -698,17 +699,43 @@ def _predict(
     }
 
 
+def _slot_local(local: datetime) -> str:
+    """把本地时刻向下取整到 15 分钟，返回 YYYY-MM-DDTHH:MM。"""
+    slot = local.replace(
+        minute=(local.minute // 15) * 15, second=0, microsecond=0
+    )
+    return slot.strftime("%Y-%m-%dT%H:%M")
+
+
+def _mode_for(local: datetime) -> str:
+    """按 slot 的分钟位判定采样节奏：整点为 hourly，15/30/45 为 dense。"""
+    minute = (local.minute // 15) * 15
+    return "hourly" if minute == 0 else "dense"
+
+
+def _in_window(local: datetime) -> bool:
+    """该本地时刻是否落在日出日落窗口（05-08、17-20，含端点）。"""
+    hour = local.hour
+    return 5 <= hour <= 8 or 17 <= hour <= 20
+
+
 def _process_cam(
     cam: dict[str, Any],
     out_dir: Path,
+    slot_local: str,
     hour_local: str,
+    mode: str,
+    in_window: bool,
     started_utc: datetime,
     physics_module: Any,
     physics_error: str | None,
 ) -> tuple[dict[str, Any], bool, bool]:
     errors: list[str] = []
     frame_path = (
-        out_dir / "frames" / str(cam["room_id"]) / (hour_local.replace(":", "") + ".jpg")
+        out_dir
+        / "frames"
+        / str(cam["room_id"])
+        / (slot_local.replace(":", "") + ".jpg")
     )
     frame: dict[str, Any] | None = None
     stream_ok = True
@@ -760,7 +787,10 @@ def _process_cam(
     record = {
         "ts_utc": started_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "ts_local": local.isoformat(timespec="seconds"),
+        "slot_local": slot_local,
         "hour_local": hour_local,
+        "mode": mode,
+        "in_window": in_window,
         "room_id": int(cam["room_id"]),
         "cam_name": cam["name"],
         "coord_note": cam["coord_note"],
@@ -792,9 +822,10 @@ def _existing_keys(ledger_dir: Path) -> set[tuple[str, str]]:
             except json.JSONDecodeError:
                 continue
             room_id = record.get("room_id")
-            hour_local = record.get("hour_local")
-            if room_id is not None and hour_local:
-                keys.add((str(room_id), str(hour_local)))
+            # 历史记录没有 slot_local 时，退回用 hour_local 作为时段键。
+            slot = record.get("slot_local") or record.get("hour_local")
+            if room_id is not None and slot:
+                keys.add((str(room_id), str(slot)))
     return keys
 
 
@@ -807,6 +838,7 @@ def _append_record(out_dir: Path, record: dict[str, Any], force: bool) -> None:
 
     if force and path.exists():
         kept: list[str] = []
+        incoming_slot = record.get("slot_local") or record["hour_local"]
         for raw in path.read_text(encoding="utf-8").splitlines():
             if not raw.strip():
                 continue
@@ -815,9 +847,13 @@ def _append_record(out_dir: Path, record: dict[str, Any], force: bool) -> None:
             except json.JSONDecodeError:
                 kept.append(raw)
                 continue
+            # 优先按 slot_local 覆盖，历史行没有该字段时退回 hour_local。
+            existing_slot = existing.get("slot_local") or existing.get(
+                "hour_local"
+            )
             if (
                 str(existing.get("room_id")) == str(record["room_id"])
-                and existing.get("hour_local") == record["hour_local"]
+                and existing_slot == incoming_slot
             ):
                 continue
             kept.append(raw)
@@ -910,8 +946,11 @@ def main(argv: list[str] | None = None) -> int:
     for index, cam in enumerate(cams, 1):
         started_utc = datetime.now(timezone.utc)
         local = started_utc.astimezone(LOCAL_TZ)
+        slot_local = _slot_local(local)
         hour_local = local.strftime("%Y-%m-%dT%H:00")
-        key = (str(cam["room_id"]), hour_local)
+        mode = _mode_for(local)
+        in_window = _in_window(local)
+        key = (str(cam["room_id"]), slot_local)
         label = "[%d/%d] %s %s" % (
             index,
             len(cams),
@@ -922,14 +961,17 @@ def main(argv: list[str] | None = None) -> int:
         if key in existing and not args.force:
             skipped += 1
             consecutive_stream_failures = 0
-            print("%s: 跳过（本小时已有记录）" % label)
+            print("%s: 跳过（本时段已有记录: %s）" % (label, slot_local))
             continue
 
         try:
             record, stream_ok, cam_success = _process_cam(
                 cam,
                 out_dir,
+                slot_local,
                 hour_local,
+                mode,
+                in_window,
                 started_utc,
                 physics_module,
                 physics_error,

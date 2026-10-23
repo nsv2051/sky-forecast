@@ -98,6 +98,31 @@ def _status(record: dict[str, Any]) -> str:
     return NO_PREDICTION
 
 
+def _mode(record: dict[str, Any]) -> str:
+    """读取 mode；历史记录缺失时按 slot 分钟位回退推断采样节奏。"""
+    mode = record.get("mode")
+    if mode in ("hourly", "dense"):
+        return str(mode)
+    stamp = (
+        record.get("slot_local")
+        or record.get("hour_local")
+        or record.get("ts_local")
+        or record.get("ts_utc")
+        or ""
+    )
+    try:
+        minute = datetime.strptime(str(stamp)[:16], "%Y-%m-%dT%H:%M").minute
+    except ValueError:
+        return "hourly"
+    return "hourly" if (minute // 15) * 15 == 0 else "dense"
+
+
+def _in_window(record: dict[str, Any]) -> bool | None:
+    """读取 in_window；历史记录缺失时为 None（不计入窗口或非窗口）。"""
+    value = record.get("in_window")
+    return value if isinstance(value, bool) else None
+
+
 def _suspicious(record: dict[str, Any]) -> bool:
     if _status(record) != OVERLOOK_STATUS:
         return False
@@ -140,6 +165,21 @@ def main(argv: list[str] | None = None) -> int:
     if not records:
         print("台账为空: %s" % (out_dir / "ledger"))
         return 0
+
+    mode_counts = Counter(_mode(record) for record in records)
+    print(
+        "模式分布\thourly=%d\tdense=%d"
+        % (mode_counts.get("hourly", 0), mode_counts.get("dense", 0))
+    )
+    window_counts = Counter(_in_window(record) for record in records)
+    print(
+        "窗口分布\t窗口内=%d\t非窗口=%d\t未知=%d"
+        % (
+            window_counts.get(True, 0),
+            window_counts.get(False, 0),
+            window_counts.get(None, 0),
+        )
+    )
 
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
     order: list[tuple[str, str]] = []

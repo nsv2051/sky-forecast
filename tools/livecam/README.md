@@ -1,16 +1,22 @@
 # livecam 慢直播云海对照采集
 
-逐时抓取 5 路 B 站慢直播画面，同时拉取同机位坐标的 Open-Meteo 逐时预报，用仓库现有
-`core.physics.sea_of_clouds.compute_sci` 计算云海指数，并把画面统计、预报和预测写入
-同一行 JSONL 台账，供后续做"预测 vs 实际"校准。
+按 15 分钟时段（slot）抓取 5 路 B 站慢直播画面，同时拉取同机位坐标的 Open-Meteo
+逐时预报，用仓库现有 `core.physics.sea_of_clouds.compute_sci` 计算云海指数，并把画面
+统计、预报和预测写入同一行 JSONL 台账，供后续做"预测 vs 实际"校准。
 
 ## 用途
 
-- 每个机位每小时抓取一张 JPEG 画面，作为"云/雾遮挡"的像素代理记录。
+- 每个机位在同一 15 分钟时段内只抓取一张 JPEG 画面，作为"云/雾遮挡"的像素代理记录。
 - 用机位自身的纬度、经度、海拔向 Open-Meteo 请求逐时地面要素和气压层廓线，匹配当前
-  本地小时，再调用 `compute_sci` 得到 `sci`、`status`、`state` 等预测字段。
-- 每路机位在同一小时产生一行 JSONL，画面与预测同处一行，便于按月汇总比对。
-- `report.py` 只读台账，打印每个机位的样本数、帧成功率、预测状态分布和可疑组合。
+  本地整点，再调用 `compute_sci` 得到 `sci`、`status`、`state` 等预测字段。
+- 每路机位在同一时段产生一行 JSONL，画面与预测同处一行，便于按月汇总比对。
+  同一小时内可以有多行（分别对应 00/15/30/45 分时段）。
+- `mode` 表示采样节奏：整点 slot（分钟位 `00`，由逐时任务产生）为 `hourly`，
+  15 分钟档 slot（分钟位 `15`/`30`/`45`，由加密任务产生）为 `dense`。
+- `in_window` 表示该时刻是否落在日出日落窗口（05-08、17-20 点，含端点），与采样
+  节奏相互独立：窗口内也可能有整点 `hourly` 记录，窗口外也可能有 15 分钟档 `dense` 记录。
+- `report.py` 只读台账，打印每个机位的样本数、帧成功率、预测状态分布和可疑组合，
+  并分别统计 `hourly` 与 `dense` 的样本数，以及窗口内/窗口外样本数。
 
 ## 运行方式
 
@@ -34,7 +40,7 @@ env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
   python3 tools/livecam/collect.py --verbose
 
-# 覆盖当前小时已有记录
+# 覆盖当前 15 分钟时段已有记录
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy \
   python3 tools/livecam/collect.py --force
 
@@ -52,18 +58,32 @@ python3 tools/livecam/report.py --since 2026-10-01
 `env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy`，避免外层工具或
 依赖代理的下载环节受影响。
 
+### 定时任务建议
+
+可以配置两条定时任务，共用同一个脚本，不需要额外的 job 编号或环境变量：
+
+- 逐时任务：每小时的第 0 分钟运行一次，覆盖全天，产生 `hourly` 记录。
+- 加密窗口任务：在 05-08、17-20 点内的 15/30/45 分运行，用于日出日落窗口加密采集，
+  产生 `dense` 记录（整点仍由逐时任务负责）。
+
+两条任务落在同一 slot 时会由台账去重自动跳过其中一个，不会重复抓帧。具体调度时间
+可按机器负载调整，但应保证加密任务使用 15/30/45 分钟附近的触发时刻。
+
 ### 参数
 
 | 参数 | 说明 |
 | --- | --- |
 | `--check` | 只做取流与单帧连通性检查，不写台账、不请求预报。 |
 | `--only ROOM_ID` | 只处理指定 `room_id`，可重复使用；未找到的机位会提示。 |
-| `--force` | 覆盖同一 `room_id` + `hour_local` 的已有记录（先剔除旧行再追加）。 |
+| `--force` | 覆盖同一 `room_id` + `slot_local` 的已有记录（先剔除旧行再追加）。 |
 | `--out DIR` | 输出根目录，默认 `data/livecam`。 |
 | `--cams FILE` | 机位配置 JSON，默认本目录 `cams.json`。 |
 | `--verbose` | 打印每路的帧统计与预测摘要。 |
 
-不带 `--force` 时，若台账中已存在同一机位同一本地小时的记录，本轮会跳过该机位。
+不带 `--force` 时，若台账中已存在同一机位同一 15 分钟时段的记录，本轮会跳过该机位。
+时段键 `slot_local` 是实际采集时刻向下取整到 15 分钟后的本地时间，例如 08:07 归入
+`08:00`、05:23 归入 `05:15`。历史记录没有 `slot_local` 字段时，回退使用其
+`hour_local` 作为时段键，因此旧台账仍会被识别为"已采过"，不会重复抓取。
 
 ## 产物结构
 
@@ -71,15 +91,18 @@ python3 tools/livecam/report.py --since 2026-10-01
 data/livecam/
 ├── frames/
 │   ├── 1718159119/
-│   │   └── 20261023T14.jpg
+│   │   ├── 2026-10-23T0500.jpg
+│   │   └── 2026-10-23T0515.jpg
 │   └── 23046729/
-│       └── 20261023T14.jpg
+│       └── 2026-10-23T0800.jpg
 └── ledger/
     └── 2026-10.jsonl
 ```
 
-- `frames/<room_id>/<YYYYMMDDTHH>.jpg`：按本地小时命名的单帧画面。
-- `ledger/YYYY-MM.jsonl`：按 `hour_local` 的年月分文件，每行一条 JSON 记录。
+- `frames/<room_id>/<YYYY-MM-DDTHHMM>.jpg`：按本地 slot 命名的单帧画面，分钟位只会是
+  `00`、`15`、`30`、`45`。整点 slot 的文件名与历史逐时帧完全一致。
+- `ledger/YYYY-MM.jsonl`：按 `hour_local` 的年月分文件，每行一条 JSON 记录；同一小时
+  可以有多行不同 slot 的记录。
 
 每条记录的主要字段：
 
@@ -87,7 +110,10 @@ data/livecam/
 | --- | --- |
 | `ts_utc` | 本轮采集开始时间（UTC，`...Z`）。 |
 | `ts_local` | 同一时刻的本地时间（Asia/Shanghai，带偏移）。 |
-| `hour_local` | 归档所用的本地小时，`YYYY-MM-DDTHH:00`。 |
+| `slot_local` | 去重与帧文件命名的本地 15 分钟时段，`YYYY-MM-DDTHH:MM`。 |
+| `hour_local` | 归档与预报匹配所用的本地整点，`YYYY-MM-DDTHH:00`。 |
+| `mode` | 采样节奏：整点 slot（分钟位 `00`）为 `hourly`，15 分钟档 slot（分钟位 `15`/`30`/`45`）为 `dense`。 |
+| `in_window` | 该时刻是否处于日出日落窗口（05-08、17-20 点，含端点），布尔值。 |
 | `room_id` / `cam_name` | B 站房间号与机位名称。 |
 | `coord_note` | 坐标精度备注，`exact` 或 `approximate`。 |
 | `frame` | 帧文件路径、大小、MD5、尺寸及下述图像统计；失败时为 `null` 统计并带 `error`。 |
