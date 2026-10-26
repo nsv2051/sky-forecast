@@ -457,7 +457,8 @@
   .ov-row.is-active .ov-name .n::after { content: " · 当前"; font-size: 11px; font-weight: 600; color: var(--accent-ink); }
   html[data-theme="dark"] .ov-row:hover { background: rgba(255,255,255,0.06); }
   .ov-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .ov-name { min-width: 0; }
+  .ov-name { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; }
+  .ov-name .ov-id, .ov-name .ov-meta { min-width: 0; }
   .ov-name .n {
     font-size: 14px; font-weight: 660; letter-spacing: -0.01em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -470,6 +471,7 @@
     font-size: 11px; font-weight: 500; color: var(--text-3-ink); margin-top: 1px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+  .ov-name .ov-meta { min-width: 0; }
   .ov-badge {
     flex: none; width: 24px; height: 24px; border-radius: 8px;
     display: inline-flex; align-items: center; justify-content: center;
@@ -544,6 +546,13 @@
     .compact-dec-strip .cds-reasons { white-space: normal; overflow: visible; text-overflow: clip; }
     .compact-dec-strip { align-items: flex-start; }
     .cds-right { padding-top: 1px; }
+  }
+  @media (min-width: 1000px) {
+    .ov-head, .ov-row { grid-template-columns: 24px minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); }
+    .ov-name { grid-template-columns: minmax(0, 1fr) auto; column-gap: 18px; }
+    .ov-name .ov-meta { text-align: right; }
+    .ov-name .ov-times { margin-top: 0; }
+    .ov-name .m2 { margin-top: 2px; }
   }
 
   /* ---------------- Timeline (实战时刻) ---------------- */
@@ -1809,11 +1818,15 @@
         row.appendChild(el("div", "ov-badge", initialOf(s.name)));
 
         var nameWrap = el("div", "ov-name");
-        nameWrap.appendChild(el("div", "n", s.name));
+        var idWrap = el("div", "ov-id");
+        var metaWrap = el("div", "ov-meta");
+        idWrap.appendChild(el("div", "n", s.name));
         var meta = el("div", "m");
         meta.appendChild(el("span", "region", (s.region || "\u2014") + " \u00b7 "));
         meta.appendChild(document.createTextNode(num(s.elevation_m) + " m"));
-        nameWrap.appendChild(meta);
+        idWrap.appendChild(meta);
+        nameWrap.appendChild(idWrap);
+        nameWrap.appendChild(metaWrap);
 
         if (dates[0] && s.lat != null && s.lon != null) {
           var timesEl = el("div", "ov-times",
@@ -1824,7 +1837,7 @@
               " \u51fa " + formatMin(eventMinutes(s, d, "sunrise")) +
               " \u843d " + formatMin(eventMinutes(s, d, "sunset"));
           }).join(" \u00b7 ");
-          nameWrap.appendChild(timesEl);
+          metaWrap.appendChild(timesEl);
         }
 
         var dir = (s.orientation && s.orientation.primary) || "";
@@ -1832,7 +1845,7 @@
         var m2bits = [];
         if (dir) m2bits.push(dir + "\u5411");
         if (focal && focal.length === 2) m2bits.push(focal[0] + "-" + focal[1] + "mm");
-        if (m2bits.length) nameWrap.appendChild(el("div", "m2", m2bits.join(" \u00b7 ")));
+        if (m2bits.length) metaWrap.appendChild(el("div", "m2", m2bits.join(" \u00b7 ")));
         row.appendChild(nameWrap);
 
         dates.forEach(function (date) {
