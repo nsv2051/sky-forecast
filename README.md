@@ -59,7 +59,7 @@ python3 -m unittest discover -s tests -q         # 38 个测试，全部通过
 | --- | --- | ---: | :---: | --- |
 | `zhengzhou_urban` | 郑州市区 | 109 | false | high |
 | `nanyang_urban` | 南阳市区 | 126 | false | medium |
-| `songshan_junjifeng` | 嵩山·峻极峰 | 814 | true | high |
+| `songshan_junjifeng` | 嵩山·峻极峰 | 1492 | true | high |
 | `songshan_yunding` | 嵩山·云顶草甸 | 1200 | true | high |
 | `wuzhiling` | 五指岭 | 1121 | true | high |
 | `laojunshan_jinding` | 老君山·金顶 | 1228 | true | high |
