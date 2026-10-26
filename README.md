@@ -60,14 +60,14 @@ python3 -m unittest discover -s tests -q         # 38 个测试，全部通过
 | `zhengzhou_urban` | 郑州市区 | 109 | false | high |
 | `nanyang_urban` | 南阳市区 | 126 | false | medium |
 | `songshan_junjifeng` | 嵩山·峻极峰 | 1492 | true | high |
-| `songshan_yunding` | 嵩山·云顶草甸 | 1200 | true | high |
+| `songshan_yunding` | 嵩山·云顶草甸 | 1345 | true | high |
 | `wuzhiling` | 五指岭 | 1121 | true | high |
-| `laojunshan_jinding` | 老君山·金顶 | 1228 | true | high |
-| `baiyunshan_yuhuangding` | 白云山·玉皇顶 | 1527 | true | high |
-| `laojieling_jijiaojian` | 老界岭·犄角尖 | 1101 | true | high |
-| `tongbaishan_taibaiding` | 桐柏山·太白顶 | 672 | true | medium |
-| `wuduoshan` | 五朵山 | 447 | true | medium |
-| `baotianman` | 宝天曼 | 225 | true | medium |
+| `laojunshan_jinding` | 老君山·金顶 | 2217 | true | high |
+| `baiyunshan_yuhuangding` | 白云山·玉皇顶 | 2216 | true | high |
+| `laojieling_jijiaojian` | 老界岭·犄角尖 | 2223 | true | high |
+| `tongbaishan_taibaiding` | 桐柏山·太白顶 | 1140 | true | medium |
+| `wuduoshan` | 五朵山 | 1626 | true | medium |
+| `baotianman` | 宝天曼 | 1803 | true | medium |
 
 平原市区海拔低、始终位于云顶之下，`sea_of_clouds=false`，不参与云海评分。
 
