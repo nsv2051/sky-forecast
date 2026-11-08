@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
 <meta name="theme-color" content="#0a84ff" />
+<link rel="icon" href="data:," />
 <title>郑州及周边 · 天空观景指数</title>
 <meta name="description" content="郑州及周边 150km 火烧云、云海与日出日落观景指数预报，基于 ECMWF、和风天气与大气光路物理推算。" />
 <style>
@@ -644,6 +645,62 @@
   .pro-bar { height: 3px; border-radius: 999px; background: var(--separator); overflow: hidden; margin-top: 5px; }
   .pro-bar > i { display: block; height: 100%; border-radius: 999px; }
 
+  /* ---------------- Multi-model consensus ---------------- */
+  .consensus-sources { margin-top: 10px; }
+  .consensus-sources > summary {
+    list-style: none; cursor: pointer; padding: 6px 0;
+    font-size: 12px; font-weight: 600; color: var(--text-2);
+  }
+  .consensus-sources > summary::-webkit-details-marker { display: none; }
+  .consensus-sources > summary::before { content: "\25B8 "; color: var(--text-3-ink); }
+  .consensus-sources[open] > summary::before { content: "\25BE "; }
+  .cs-card {
+    min-width: 0; margin-top: 6px; padding: 8px 10px;
+    background: var(--surface-2); border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .cs-layer { font-size: 11px; font-weight: 600; color: var(--text-3-ink); margin-bottom: 4px; }
+  .cs-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; min-width: 0; }
+  .cs-cell { min-width: 0; text-align: center; font-variant-numeric: tabular-nums; }
+  .cs-cell .ck {
+    font-size: 10px; color: var(--text-3-ink); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .cs-cell .cv { font-size: 12px; font-weight: 700; color: var(--text); }
+  .cs-cell.cs-consensus .cv { color: var(--accent-ink); }
+  @media (max-width: 390px) {
+    .cs-card { padding: 7px 8px; }
+    .cs-row { gap: 2px; }
+    .cs-cell .ck { font-size: 9.5px; }
+    .cs-cell .cv { font-size: 11.5px; }
+  }
+
+  /* ---------------- Expected glow colour ---------------- */
+  .color-block { padding-top: var(--space-3); }
+  .color-row { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+  .color-swatch {
+    flex: none; width: 52px; height: 52px; border-radius: 14px;
+    border: 0.5px solid var(--border);
+    background: #000;
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.28), 0 2px 8px rgba(0, 0, 0, 0.18);
+  }
+  .color-meta { min-width: 0; flex: 1 1 auto; }
+  .color-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; min-width: 0; }
+  .color-name { font-size: 16px; font-weight: 720; letter-spacing: -0.01em; }
+  .color-hex {
+    font-size: 11.5px; font-weight: 600; color: var(--text-3-ink);
+    font-variant-numeric: tabular-nums; text-transform: lowercase;
+  }
+  .color-sub { font-size: 12px; color: var(--text-2); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .color-bar { height: 4px; border-radius: 999px; background: var(--separator); overflow: hidden; margin-top: 7px; }
+  .color-bar > i { display: block; height: 100%; border-radius: 999px; }
+  .color-note { font-size: 11px; color: var(--text-3-ink); margin-top: 7px; }
+  @media (max-width: 560px) {
+    .color-row { gap: 10px; }
+    .color-swatch { width: 46px; height: 46px; border-radius: 12px; }
+    .color-name { font-size: 15px; }
+  }
+
   .conf-row {
     display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-2); margin-top: var(--space-3);
@@ -958,11 +1015,21 @@
 
       var chips = $("srcChips");
       chips.innerHTML = "";
+      var ds = String(meta.data_source || "");
+      var live = ds.indexOf("open-meteo") === 0;
+      var consensus = Array.isArray(meta.consensus_models) ? meta.consensus_models : [];
       var sources = [
-        { label: "ECMWF", on: meta.data_source === "open-meteo" },
-        { label: "QWeather", on: meta.ground_source === "qweather" },
-        { label: "物理光路推算", on: true }
+        { label: live ? "Open-Meteo" : (ds === "mock" ? "演示数据" : "数据源"), on: live }
       ];
+      [
+        { id: "ecmwf_ifs025", label: "ECMWF IFS" },
+        { id: "gfs_seamless", label: "GFS" },
+        { id: "icon_seamless", label: "ICON" }
+      ].forEach(function (m) {
+        sources.push({ label: m.label, on: consensus.indexOf(m.id) >= 0 });
+      });
+      sources.push({ label: "QWeather", on: meta.ground_source === "qweather" });
+      sources.push({ label: "物理光路推算", on: true });
       sources.forEach(function (s) {
         var c = el("span", "chip");
         var dot = el("span", "dot");
@@ -1209,6 +1276,26 @@
         if (diff < bestDiff) { bestDiff = diff; best = h; }
       }
       return best || nearestHourly(hours);
+    }
+
+    /* 霞光取样：同一天、仍受光（color_deck != null）的整点中，
+       取事件时刻之前最晚的一条；之前没有则取之后最近的一条。 */
+    function glowSample(spot, ev) {
+      var hours = (spot && spot.hourly) || [];
+      if (!hours.length || !ev) return null;
+      var before = null, beforeMin = -Infinity;
+      var after = null, afterMin = Infinity;
+      for (var i = 0; i < hours.length; i++) {
+        var h = hours[i];
+        var t = (h.time_local || "").slice(0, 16);
+        if (t.slice(0, 10) !== ev.date) continue;
+        if (h.color_deck == null) continue;
+        var m = minutesOf(t.slice(11, 16));
+        if (m <= ev.minutes) {
+          if (m > beforeMin) { beforeMin = m; before = h; }
+        } else if (m < afterMin) { afterMin = m; after = h; }
+      }
+      return before || after || null;
     }
 
     /* Selected event for a spot; falls back to the nearest future event. */
@@ -1500,12 +1587,26 @@
       var t = clamp((x - e0) / (e1 - e0), 0, 1);
       return t * t * (3 - 2 * t);
     }
-    /* 太阳掠射闸门，对齐 core/physics/burning_cloud.py::_sun_score。 */
-    function sunScore(e) {
+    /* 太阳高度角闸门，对齐 core/physics/burning_cloud.py::_sun_score。
+       地平线以下由画布自身受光极限 α_min 决定，本影边缘用太阳视半直径做软边。 */
+    function sunScore(e, cloudMid, cloudHigh) {
       if (e == null) return 0.5;
-      if (e <= -2.0) return 0.03 + 0.97 * smoothstep(-12.0, -2.0, e);
-      if (e <= 6.0) return 1.0;
-      return 1.0 - 0.95 * smoothstep(6.0, 26.0, e);
+      if (e > 6.0) return clamp(1.0 - 0.95 * smoothstep(6.0, 26.0, e), 0.03, 1.0);
+      if (e >= 0.0) return 1.0;
+      var alphaMin = deckShadowLimitDeg(canvasHeightM(cloudMid, cloudHigh));
+      var t = smoothstep(alphaMin - 0.266, alphaMin + 0.266, e);
+      return clamp(0.03 + 0.97 * t, 0.03, 1.0);
+    }
+    /* 按云量加权的画布高度，对齐 core/physics/burning_cloud.py::canvas_height_m。 */
+    function canvasHeightM(mid, high) {
+      mid = num(mid); high = num(high);
+      var total = mid + high;
+      if (total <= 1e-9) return 8600.0;
+      return (5200.0 * mid + 8600.0 * high) / total;
+    }
+    /* 画布受光极限，对齐 core/physics/burning_cloud.py::deck_shadow_limit_deg。 */
+    function deckShadowLimitDeg(h) {
+      return -Math.sqrt(2.0 * Math.max(0, h) / 6371000.0) * 180.0 / Math.PI;
     }
     /* 中高云画布质量，对齐 core/physics/burning_cloud.py::cloud_canvas（仅用于 bci_components 缺失时兜底）。 */
     function canvasQuality(mid, high) {
@@ -1534,8 +1635,10 @@
 
       var e = h.sun_elevation != null ? num(h.sun_elevation)
         : (cur.sun_elevation != null ? num(cur.sun_elevation) : null);
-      var spct = Math.round(sunScore(e) * 100);
+      var spct = Math.round(sunScore(e, cm, ch) * 100);
+      var alphaMin = deckShadowLimitDeg(canvasHeightM(cm, ch));
       var sunG = e == null ? "无高度记录"
+        : e < alphaMin ? "已入本影·画布不受光"
         : e <= -12 ? "太阳已落深"
         : e <= -6 ? "余晖微弱"
         : e <= -2 ? "贴地平线"
@@ -1695,6 +1798,47 @@
       return block;
     }
 
+    /* 预计霞光色彩：色块 + 中文色名 + 亮度百分比（不抢 BCI 主信息）。 */
+    function colourPanel(win, fallback, glow) {
+      var src = null;
+      if (glow && glow.color_hex) src = glow;
+      else if (win && win.color_hex) src = win;
+      else if (fallback && fallback.color_hex) src = fallback;
+      if (!src) return null;
+      var block = el("div", "panel-block color-block");
+      block.appendChild(el("div", "pb-title", "🎨 预计霞光色彩"));
+      var row = el("div", "color-row");
+      var swatch = el("span", "color-swatch");
+      swatch.style.background = src.color_hex;
+      swatch.setAttribute("aria-hidden", "true");
+      row.appendChild(swatch);
+      var meta = el("div", "color-meta");
+      var title = el("div", "color-title");
+      title.appendChild(el("span", "color-name", src.color_name || "—"));
+      title.appendChild(el("span", "color-hex", src.color_hex));
+      meta.appendChild(title);
+      var pct = Math.round(clamp(num(src.color_brightness), 0, 1) * 100);
+      meta.appendChild(el("div", "color-sub", "亮度 " + pct + "% · 直射光透射色"));
+      var bar = el("div", "color-bar");
+      var fill = el("i");
+      fill.style.width = clamp(pct, 0, 100) + "%";
+      fill.style.background = src.color_hex;
+      bar.appendChild(fill);
+      meta.appendChild(bar);
+      row.appendChild(meta);
+      block.appendChild(row);
+      var noteParts = [];
+      if (glow) {
+        var hm = (glow.time_local || "").slice(11, 16);
+        if (hm) noteParts.push("取自 " + hm);
+      }
+      noteParts.push(src.color_deck || "无受光云层");
+      noteParts.push("AOD 550nm 0.20（假设值）");
+      noteParts.push("仅示意");
+      block.appendChild(el("div", "color-note", noteParts.join(" · ")));
+      return block;
+    }
+
     function proGridBlock(title, tagText, cells) {
       var block = el("div", "panel-block");
       var t = el("div", "pb-title");
@@ -1723,6 +1867,71 @@
         grid.appendChild(cell);
       });
       block.appendChild(grid);
+      return block;
+    }
+
+    function consensusCells(entry) {
+      var con = (entry && entry.consensus) || {};
+      var defs = [
+        { key: "low", name: "低云", icon: "☁️" },
+        { key: "mid", name: "中云", icon: "🌫️" },
+        { key: "high", name: "高云", icon: "🌤️" }
+      ];
+      return defs.map(function (d) {
+        var c = con[d.key] || {};
+        var mean = c.mean;
+        var agreement = c.agreement;
+        var g;
+        if (agreement == null) {
+          g = c.note || "有效模式不足";
+        } else {
+          g = "离散 " + Math.round(num(c.spread)) + " 点 · 一致度 " +
+            (c.level || "—") + "(" + Math.round(num(agreement)) + ")";
+        }
+        return {
+          k: d.name + "共识", icon: d.icon,
+          v: mean == null ? "—" : String(Math.round(num(mean))),
+          unit: mean == null ? "" : "%",
+          g: g, pct: mean == null ? null : clamp(num(mean), 0, 100),
+          c: agreement == null ? null : toneColor(agreement, 75, 45),
+          ink: agreement == null ? null : toneInk(agreement, 75, 45)
+        };
+      });
+    }
+
+    function consensusBlock(entry) {
+      if (!entry || !entry.consensus) return null;
+      var block = proGridBlock("🧩 模式共识", "多源", consensusCells(entry));
+      var det = el("details", "consensus-sources");
+      det.appendChild(el("summary", null, "各源云量矩阵"));
+      var con = entry.consensus || {};
+      [
+        { key: "low", name: "低云" },
+        { key: "mid", name: "中云" },
+        { key: "high", name: "高云" }
+      ].forEach(function (d) {
+        var card = el("div", "cs-card");
+        card.appendChild(el("div", "cs-layer", d.name));
+        var row = el("div", "cs-row");
+        var c = con[d.key] || {};
+        var values = c.values || {};
+        [
+          { label: "最佳", value: values.best_match },
+          { label: "ECMWF", value: values.ecmwf_ifs025 },
+          { label: "GFS", value: values.gfs_seamless },
+          { label: "ICON", value: values.icon_seamless },
+          { label: "共识", value: c.mean, consensus: true }
+        ].forEach(function (item) {
+          var cell = el("div", "cs-cell" + (item.consensus ? " cs-consensus" : ""));
+          cell.appendChild(el("div", "ck", item.label));
+          cell.appendChild(el("div", "cv",
+            item.value == null ? "—" : Math.round(num(item.value)) + "%"));
+          row.appendChild(cell);
+        });
+        card.appendChild(row);
+        det.appendChild(card);
+      });
+      block.appendChild(det);
       return block;
     }
 
@@ -2004,6 +2213,9 @@
       var colR = el("div", "dcol dcol-right");
       colL.appendChild(decBlock);
 
+      var colour = colourPanel(win, current, glowSample(spot, ev));
+      if (colour) colL.appendChild(colour);
+
       // 3. 出工实战时刻 (4阶段时间轴)
       var tl = timelineBlock(spot);
       if (tl) colL.appendChild(tl);
@@ -2013,6 +2225,11 @@
 
       // 4. PRO 核心气象 (8宫格)
       colR.appendChild(proGridBlock("⚙️ PRO 核心气象", "PRO", buildProCells(spot)));
+
+      // 5. 模式共识（接在 8 项因子之后，仅展示多源云量一致性）
+      var consensusEntry = (win && win.consensus) ? win : current;
+      var conBlock = consensusBlock(consensusEntry);
+      if (conBlock) colR.appendChild(conBlock);
 
       cols.appendChild(colL);
       cols.appendChild(colR);

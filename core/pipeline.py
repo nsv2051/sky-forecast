@@ -16,19 +16,23 @@ safe for CI.
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from core.fetcher.open_meteo import (
+    CONSENSUS_MODELS,
+    CONSENSUS_VARIABLES,
     GRID_VARIABLES,
     PRESSURE_LEVELS,
     HourlySeries,
     OpenMeteoClient,
     OpenMeteoError,
+    mock_models,
     pressure_height,
 )
 from core.fetcher.qweather import GroundWeather, QWeatherClient
-from core.physics import burning_cloud, sea_of_clouds, solar
+from core.physics import burning_cloud, sea_of_clouds, solar, spectrum
 
 __all__ = [
     "PROJECT_ROOT",
@@ -187,6 +191,44 @@ def _fetch_series(client, coordinates, *, hours, start, variables, force_mock):
         ) from exc
 
 
+def _fetch_models(client, coordinates, *, hours, start, force_mock):
+    """Return ``(models_data, enabled_models)`` for the consensus block.
+
+    This is an *optional* second request next to the 33-variable baseline. A
+    failure must never break the forecast: the caller falls back to an empty
+    consensus set and the page simply shows the sources as unavailable.
+    """
+    if force_mock:
+        return (
+            mock_models(
+                coordinates,
+                models=CONSENSUS_MODELS,
+                variables=CONSENSUS_VARIABLES,
+                hours=hours,
+                start=start,
+            ),
+            list(CONSENSUS_MODELS),
+        )
+    fetch = getattr(client, "fetch_models", None)
+    if fetch is None:
+        return [], []
+    try:
+        data = fetch(
+            coordinates,
+            models=CONSENSUS_MODELS,
+            variables=CONSENSUS_VARIABLES,
+            hours=hours,
+            start=start,
+        )
+        if not data or all(
+            not item.get("time") or not item.get("models") for item in data
+        ):
+            raise OpenMeteoError("empty multi-model response")
+        return data, list(CONSENSUS_MODELS)
+    except Exception:  # noqa: BLE001 - consensus is optional, never fatal
+        return [], []
+
+
 # ---------------------------------------------------------------------------
 # per-spot physics
 # ---------------------------------------------------------------------------
@@ -227,7 +269,126 @@ def _ground_obs(ground, series, index):
     return max(0.1, float(raw) / 1000.0), None, "open-meteo"
 
 
-def _hourly_entry(spot: dict, series: HourlySeries, ground: GroundWeather, index: int) -> dict:
+_CONSENSUS_LAYERS = ("low", "mid", "high")
+_CONSENSUS_SOURCES = ("best_match",) + CONSENSUS_MODELS
+_CONSENSUS_WEIGHTS = {"low": 0.25, "mid": 0.35, "high": 0.40}
+
+
+def _empty_consensus(note: str = "无多模式数据") -> dict:
+    return {
+        "values": {source: None for source in _CONSENSUS_SOURCES},
+        "available": 0,
+        "mean": None,
+        "min": None,
+        "max": None,
+        "spread": None,
+        "stdev": None,
+        "agreement": None,
+        "level": None,
+        "cloud_prob": None,
+        "model_count": 0,
+        "note": note,
+    }
+
+
+def _source_number(raw, index: int) -> float | None:
+    """Read one source value, accepting either a full series or a scalar."""
+    if isinstance(raw, (list, tuple)):
+        if index < 0 or index >= len(raw):
+            return None
+        raw = raw[index]
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _consensus(models_data: dict, index: int) -> dict:
+    """Consensus for one cloud layer at one hour.
+
+    ``models_data`` maps a source name (``best_match`` plus the three
+    independent models) to either a full hourly series or a single value.
+    Agreement is a *linear* spread map — ``100 * max(0, 1 - spread/60)`` —
+    because relative measures such as ``1 - stdev/std`` explode near zero cloud
+    cover.
+    """
+    values = {
+        source: _source_number((models_data or {}).get(source), index)
+        for source in _CONSENSUS_SOURCES
+    }
+    available_values = [value for value in values.values() if value is not None]
+    available = len(available_values)
+    result = _empty_consensus()
+    result["values"] = values
+    result["available"] = available
+    result["model_count"] = available
+
+    if available:
+        mean = sum(available_values) / available
+        minimum = min(available_values)
+        maximum = max(available_values)
+        spread = maximum - minimum
+        stdev = math.sqrt(
+            sum((value - mean) ** 2 for value in available_values) / available
+        )
+        result.update(
+            {
+                "mean": round(mean, 1),
+                "min": round(minimum, 1),
+                "max": round(maximum, 1),
+                "spread": round(spread, 1),
+                "stdev": round(stdev, 2),
+                "cloud_prob": round(
+                    100.0 * sum(1 for value in available_values if value >= 30.0)
+                    / available
+                ),
+            }
+        )
+
+    if available >= 2:
+        agreement = round(100.0 * max(0.0, 1.0 - result["spread"] / 60.0))
+        result["agreement"] = agreement
+        result["level"] = "高" if agreement >= 75 else "中" if agreement >= 45 else "低"
+        result["note"] = None
+    else:
+        result["agreement"] = None
+        result["level"] = None
+        result["note"] = "有效模式不足"
+    return result
+
+
+def _layer_sources(series: HourlySeries, models_data: dict, layer: str, index: int) -> dict:
+    name = "cloud_cover_" + layer
+    data = {"best_match": series.value(name, index)}
+    models = (models_data or {}).get("models") or {}
+    for model in CONSENSUS_MODELS:
+        data[model] = (models.get(model) or {}).get(name)
+    return data
+
+
+def _consensus_score(consensus: dict):
+    total = 0.0
+    weight_sum = 0.0
+    for layer, weight in _CONSENSUS_WEIGHTS.items():
+        agreement = (consensus.get(layer) or {}).get("agreement")
+        if agreement is None:
+            continue
+        total += agreement * weight
+        weight_sum += weight
+    if not weight_sum:
+        return None
+    return round(total / weight_sum, 1)
+
+
+def _hourly_entry(
+    spot: dict,
+    series: HourlySeries,
+    ground: GroundWeather,
+    index: int,
+    models_data: dict | None = None,
+) -> dict:
     instant = _parse_time(series.time[index])
     local_hour = _local(instant).hour
     sci_observable = any(
@@ -258,6 +419,24 @@ def _hourly_entry(spot: dict, series: HourlySeries, ground: GroundWeather, index
         visibility_km=visibility_km,
         dewpoint_spread=_surface_dewpoint_spread(series, index),
     )
+    light = spectrum.deck_light(
+        position["elevation"],
+        0.2,
+        cloud_low=cloud_low,
+        cloud_mid=cloud_mid,
+        cloud_high=cloud_high,
+    )
+
+    if models_data is None:
+        consensus = {layer: _empty_consensus() for layer in _CONSENSUS_LAYERS}
+    else:
+        consensus = {
+            layer: _consensus(
+                _layer_sources(series, models_data, layer, index), index
+            )
+            for layer in _CONSENSUS_LAYERS
+        }
+    consensus_score = _consensus_score(consensus)
 
     return {
         "time": _iso_utc(instant),
@@ -285,6 +464,15 @@ def _hourly_entry(spot: dict, series: HourlySeries, ground: GroundWeather, index
         "aqi": None if aqi is None else round(float(aqi), 1),
         "ground_source": ground_source,
         "wind_speed_10m": None if wind is None else round(float(wind), 1),
+        "color_hex": light["hex"],
+        "color_name": light["name"],
+        "color_brightness": light["brightness"],
+        "color_rgb": light["rgb"],
+        "color_aod_source": light["aod_source"],
+        "color_deck": light["deck"],
+        "color_deck_height_m": light["deck_height_m"],
+        "consensus": consensus,
+        "consensus_score": consensus_score,
     }
 
 
@@ -368,6 +556,13 @@ def _select_best(hourly: list, evening: bool, spot: dict | None = None):
         "cloud_high",
         "visibility_km",
         "aqi",
+        "color_hex",
+        "color_name",
+        "color_brightness",
+        "color_rgb",
+        "color_aod_source",
+        "color_deck",
+        "color_deck_height_m",
     )
     result = {key: best[key] for key in keys}
     result["sampled_time_local"] = best["time_local"]
@@ -471,9 +666,18 @@ def _select_best_sea(hourly: list):
     return {key: best[key] for key in keys}
 
 
-def _build_spot(spot: dict, series: HourlySeries, ground: GroundWeather, hours: int) -> dict:
+def _build_spot(
+    spot: dict,
+    series: HourlySeries,
+    ground: GroundWeather,
+    hours: int,
+    models_data: dict | None = None,
+) -> dict:
     count = min(hours, len(series))
-    hourly = [_hourly_entry(spot, series, ground, i) for i in range(count)]
+    hourly = [
+        _hourly_entry(spot, series, ground, i, models_data)
+        for i in range(count)
+    ]
     best_evening = _select_best(hourly, evening=True, spot=spot)
     best_morning = _select_best(hourly, evening=False, spot=spot)
     best_sea = _select_best_sea(hourly)
@@ -860,7 +1064,12 @@ def build_forecast(
     if not spots:
         return {
             "updated_at": _iso_utc(start),
-            "meta": {"spot_count": 0, "hours": hours, "mock": mock},
+            "meta": {
+                "spot_count": 0,
+                "hours": hours,
+                "mock": mock,
+                "consensus_models": [],
+            },
             "spots": [],
             "grid": None,
             "summary": [],
@@ -876,6 +1085,14 @@ def build_forecast(
         force_mock=mock,
     )
     series_by_index = {i: series for i, series in enumerate(series_list)}
+    models_data, consensus_models = _fetch_models(
+        om,
+        spot_coords,
+        hours=hours,
+        start=start,
+        force_mock=mock,
+    )
+    models_by_index = {i: item for i, item in enumerate(models_data)}
 
     grounds = {}
     for spot in spots:
@@ -887,7 +1104,15 @@ def build_forecast(
         series = series_by_index.get(index)
         if series is None:
             series = HourlySeries(latitude=spot["lat"], longitude=spot["lon"])
-        spots_out.append(_build_spot(spot, series, grounds[spot["id"]], hours))
+        spots_out.append(
+            _build_spot(
+                spot,
+                series,
+                grounds[spot["id"]],
+                hours,
+                models_by_index.get(index),
+            )
+        )
 
     grid = None
     if include_grid:
@@ -925,6 +1150,7 @@ def build_forecast(
             "spot_count": len(spots_out),
             "mock": not live,
             "data_source": "open-meteo-live" if live else data_source,
+            "consensus_models": list(consensus_models),
             "ground_source": ground_source,
             "ground_visibility_source": (
                 "qweather" if ground_source == "qweather" else "open-meteo"

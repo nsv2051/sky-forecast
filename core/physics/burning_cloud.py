@@ -58,10 +58,27 @@ __all__ = [
     "PATH_BLOCK_LOW",
     "PATH_BLOCK_RH",
     "PATH_BLOCK_FRAC",
+    "deck_shadow_limit_deg",
+    "canvas_height_m",
+    "DECK_HEIGHT_M",
+    "SUN_ANGULAR_RADIUS_DEG",
 ]
 
 BURNING_CLOUD_MIN = 0.0
 BURNING_CLOUD_MAX = 100.0
+
+# --- 受光极限（地球本影）几何参数 -----------------------------------------
+# 画布（中/高云）所在高度。必须与谱模块的 DECK_HEIGHT_M 保持同值；
+# 这里刻意不依赖该模块，避免形成物理模块间的方向依赖。
+DECK_HEIGHT_M = {
+    "high": 8600.0,
+    "mid": 5200.0,
+    "low": 1500.0,
+}
+# 太阳视半直径（度），与谱模块的 SUN_ANGULAR_RADIUS_DEG 同值（用于软边解释，
+# 本模块的受光极限判据本身是硬几何边界）。
+SUN_ANGULAR_RADIUS_DEG = 0.266
+_R_EARTH = 6371000.0  # 地球半径（m），与谱模块的同名常数一致
 
 # --- 画布（高云 / 中云）模型参数 -------------------------------------------
 # 高云（卷云/卷层云）是主要透光画布，58% 左右最通透；中云（高积云）峰值更低、
@@ -197,19 +214,61 @@ def _aqi_score(aqi: float) -> float:
     return _clamp(1.0 - (aqi - 30.0) / 170.0, 0.4, 1.0)
 
 
-def _sun_score(sun_elevation_deg: float) -> float:
+def deck_shadow_limit_deg(deck_height_m: float) -> float:
+    """云层仍被太阳直射的最低太阳高度角（度，负值）。
+
+    由地球本影几何 ``α_min = -sqrt(2h/R)`` 得到，与
+    与谱模块的 ``shadow_limit_deg`` 是同一物理量（测试会交叉校验二者
+    一致）。高度越低，云层越早进入本影，极限越接近 0°。
+    """
+    height = max(0.0, float(deck_height_m))
+    return -math.degrees(math.sqrt(2.0 * height / _R_EARTH))
+
+
+def canvas_height_m(cloud_mid: float, cloud_high: float) -> float:
+    """按云量加权的画布高度（m）。
+
+    ``(5200·c_mid + 8600·c_high) / (c_mid + c_high)``。低云是遮挡体而不是
+    画布，因此不参与加权；中高云量都接近 0（纯晴空）时按高云处理，返回
+    8600 m。
+    """
+    mid = max(0.0, float(cloud_mid))
+    high = max(0.0, float(cloud_high))
+    total = mid + high
+    if total <= 1e-9:
+        return DECK_HEIGHT_M["high"]
+    return (
+        DECK_HEIGHT_M["mid"] * mid + DECK_HEIGHT_M["high"] * high
+    ) / total
+
+
+def _sun_score(
+    sun_elevation_deg: float,
+    cloud_mid: float = 50.0,
+    cloud_high: float = 50.0,
+) -> float:
     """太阳高度角对火烧云的乘性闸门（0.03-1.0）。
 
-    只有贴近地平线的掠射光才能烧起来：太阳落到地平线以下越深，可用的
-    余晖越少；太阳升高后光线变白、角度变陡，火烧云迅速熄灭。该分数直接
-    乘在最终指数上，因此没有掠射光时可以一票否决。
+    只有贴近地平线的掠射光才能烧起来：太阳升高后光线变白、角度变陡，
+    火烧云迅速熄灭。太阳落到地平线以下后，画布能否继续受光只由其在
+    :func:`deck_shadow_limit_deg` 之上的受光极限决定——在极限之上仍按满分
+    处理，落入地球本影才压到底部；本影边缘用真实太阳视半直径做软边。
+    该分数直接乘在最终指数上，因此没有掠射光时可以一票否决。
     """
     e = sun_elevation_deg
-    if e <= -2.0:
-        return 0.03 + 0.97 * _smoothstep(-12.0, -2.0, e)
+    if e < 0.0:
+        limit = deck_shadow_limit_deg(
+            canvas_height_m(cloud_mid, cloud_high)
+        )
+        t = _smoothstep(
+            limit - SUN_ANGULAR_RADIUS_DEG,
+            limit + SUN_ANGULAR_RADIUS_DEG,
+            e,
+        )
+        return _clamp(0.03 + 0.97 * t, 0.03, 1.0)
     if e <= 6.0:
         return 1.0
-    return 1.0 - 0.95 * _smoothstep(6.0, 26.0, e)
+    return _clamp(1.0 - 0.95 * _smoothstep(6.0, 26.0, e), 0.03, 1.0)
 
 
 def grade_bci(bci: float) -> str:
@@ -391,7 +450,7 @@ def compute_bci(
     )
     comp_horizon = max(_FLOOR, _horizon_score(cloud_low, horizon_low_cloud))
     comp_visibility = max(_FLOOR, _visibility_score(visibility_km))
-    comp_sun = _sun_score(sun_elevation)
+    comp_sun = _sun_score(sun_elevation, cloud_mid, cloud_high)
     comp_aqi = (
         max(_FLOOR, _aqi_score(float(aqi))) if aqi is not None else 1.0
     )

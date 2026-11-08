@@ -35,11 +35,14 @@ __all__ = [
     "DEFAULT_VARIABLES",
     "GRID_VARIABLES",
     "BASE_VARIABLES",
+    "CONSENSUS_MODELS",
+    "CONSENSUS_VARIABLES",
     "PRESSURE_LEVELS",
     "PRESSURE_HEIGHTS",
     "pressure_height",
     "mock_elevation",
     "mock_hourly",
+    "mock_models",
 ]
 
 DEFAULT_BASE_URL = "https://api.open-meteo.com/v1"
@@ -105,6 +108,25 @@ GRID_VARIABLES = (
     "wind_speed_10m",
     "visibility",
 ) + _pressure_variables()
+
+# --- Multi-model consensus -------------------------------------------------
+# Open-Meteo bills by *cost*, not by request count:
+#
+#     cost per location = max(1.0, model_count * variable_count / 10.0)
+#
+# The consensus request uses 3 independent sources x 3 cloud variables:
+#
+#     3 * 3 / 10 = 0.9  ->  the 1.0 floor applies  ->  1.0 per location
+#
+# so on top of the 3.30/location baseline (33 variables x 1 model) this adds
+# exactly 1.0/location. ``forecast_days`` never changes the cost, and the
+# response header ``x-ratelimit-cost`` reports it for self-checks.
+CONSENSUS_MODELS = ("ecmwf_ifs025", "gfs_seamless", "icon_seamless")
+CONSENSUS_VARIABLES = (
+    "cloud_cover_low",
+    "cloud_cover_mid",
+    "cloud_cover_high",
+)
 
 
 class OpenMeteoError(RuntimeError):
@@ -376,6 +398,86 @@ class OpenMeteoClient:
                 results.append(_slice(_parse_hourly(item, lat, lon), start, hours))
         return results
 
+    def fetch_models(
+        self,
+        coordinates,
+        *,
+        models,
+        variables,
+        hours: int = 72,
+        start: datetime | None = None,
+        forecast_days: int | None = None,
+    ) -> list:
+        """Fetch several weather models in a *single* request per chunk.
+
+        Returns one dict per coordinate::
+
+            {
+                "lat": float,
+                "lon": float,
+                "time": [...],
+                "models": {model_name: {variable: [values...]}},
+            }
+
+        Open-Meteo names multi-model variables ``<variable>_<model>`` (e.g.
+        ``cloud_cover_low_ecmwf_ifs025``). The suffix is stripped with an
+        ``endswith`` test rather than ``split("_")`` because several variable
+        names already contain underscores (``relative_humidity_2m``). A model
+        that does not support a variable simply omits the key; here it is
+        marked as missing with ``None`` values instead of being filled with 0.
+        """
+        coords = [(float(lat), float(lon)) for lat, lon in coordinates]
+        if not coords:
+            return []
+        model_names = tuple(models)
+        names = tuple(variables)
+        if not model_names or not names:
+            return []
+        if forecast_days is None:
+            forecast_days = max(2, int(math.ceil(max(hours, 1) / 24.0)) + 1)
+
+        results = []
+        for chunk in _chunks(coords, self.chunk_size):
+            params = {
+                "latitude": ",".join("%.4f" % lat for lat, _ in chunk),
+                "longitude": ",".join("%.4f" % lon for _, lon in chunk),
+                "hourly": ",".join(names),
+                "models": ",".join(model_names),
+                "forecast_days": str(forecast_days),
+                "timezone": "UTC",
+            }
+            url = "%s/forecast?%s" % (
+                self.base_url,
+                urllib.parse.urlencode(params),
+            )
+            payload = self._request(url)
+            payloads = payload if isinstance(payload, list) else [payload]
+            for (lat, lon), item in zip(chunk, payloads):
+                series = _slice(_parse_hourly(item, lat, lon), start, hours)
+                parsed = {}
+                for model in model_names:
+                    suffix = "_" + model
+                    model_vars = {}
+                    for key, values in series.variables.items():
+                        if not key.endswith(suffix):
+                            continue
+                        base = key[: -len(suffix)]
+                        if base in names:
+                            model_vars[base] = list(values)
+                    for name in names:
+                        if name not in model_vars:
+                            model_vars[name] = [None] * len(series.time)
+                    parsed[model] = model_vars
+                results.append(
+                    {
+                        "lat": float(lat),
+                        "lon": float(lon),
+                        "time": list(series.time),
+                        "models": parsed,
+                    }
+                )
+        return results
+
     def mock(
         self,
         coordinates,
@@ -390,6 +492,26 @@ class OpenMeteoClient:
             coordinates,
             hours=hours,
             variables=variables,
+            start=start,
+            seed=seed,
+        )
+
+    def mock_models(
+        self,
+        coordinates,
+        *,
+        models=CONSENSUS_MODELS,
+        variables=CONSENSUS_VARIABLES,
+        hours: int = 72,
+        start: datetime | None = None,
+        seed: int = 20261017,
+    ) -> list:
+        """Deterministic offline replacement for :meth:`fetch_models`."""
+        return mock_models(
+            coordinates,
+            models=models,
+            variables=variables,
+            hours=hours,
             start=start,
             seed=seed,
         )
@@ -507,6 +629,78 @@ def _mock_one(
     )
 
 
+def _model_cloud_offset(model: str) -> int:
+    """Fixed per-model cloud offset in -12..+12 percentage points."""
+    digest = sha256(("model:" + model).encode("utf-8")).hexdigest()
+    return int(digest[:8], 16) % 25 - 12
+
+
+def _distinct_model_offsets(models) -> dict:
+    """Hash-derived offsets, nudged apart so different models never collide."""
+    offsets = {}
+    used = set()
+    for model in models:
+        offset = _model_cloud_offset(model)
+        while offset in used:
+            offset = -12 + ((offset + 13) % 25)
+        used.add(offset)
+        offsets[model] = offset
+    return offsets
+
+
+def mock_models(
+    coordinates,
+    *,
+    models=CONSENSUS_MODELS,
+    variables=CONSENSUS_VARIABLES,
+    hours: int = 72,
+    start: datetime | None = None,
+    seed: int = 20261017,
+) -> list:
+    """Deterministic offline multi-model payload (mirrors :meth:`fetch_models`).
+
+    Every model reuses the same synthetic field with a fixed cloud offset derived
+    from the model name, so repeated calls are byte-identical and the consensus
+    spread is non-zero without any network access.
+    """
+    start = _floor_hour(start or datetime.now(timezone.utc))
+    model_names = tuple(models)
+    names = tuple(variables) if variables else CONSENSUS_VARIABLES
+    results = []
+    for lat, lon in coordinates:
+        base = _mock_one(
+            float(lat), float(lon), start, int(hours), names, seed
+        )
+        model_vars = {}
+        offsets = _distinct_model_offsets(model_names)
+        for model in model_names:
+            cloud_offset = offsets[model]
+            data = {}
+            for name in names:
+                series = base.variables.get(name) or []
+                values = []
+                for raw in series:
+                    if raw is None:
+                        values.append(None)
+                    elif name.startswith("cloud_cover_"):
+                        values.append(
+                            round(_clamp(float(raw) + cloud_offset, 0.0, 100.0), 2)
+                        )
+                    else:
+                        values.append(raw)
+                data[name] = values
+            model_vars[model] = data
+        results.append(
+            {
+                "lat": float(lat),
+                "lon": float(lon),
+                "time": list(base.time),
+                "models": model_vars,
+            }
+        )
+    return results
+
+
 def mock_hourly(
     coordinates,
     *,
@@ -514,9 +708,24 @@ def mock_hourly(
     variables=None,
     start: datetime | None = None,
     seed: int = 20261017,
+    models=None,
 ) -> list:
-    """Generate deterministic mock :class:`HourlySeries` for CI / offline use."""
+    """Generate deterministic mock data for CI / offline use.
+
+    Without ``models`` this keeps returning the legacy single-model
+    :class:`HourlySeries` list. Passing ``models`` switches to the multi-model
+    dict payload used by :meth:`OpenMeteoClient.fetch_models`.
+    """
     start = _floor_hour(start or datetime.now(timezone.utc))
+    if models:
+        return mock_models(
+            coordinates,
+            models=models,
+            variables=variables,
+            hours=hours,
+            start=start,
+            seed=seed,
+        )
     names = tuple(variables) if variables else DEFAULT_VARIABLES
     return [
         _mock_one(float(lat), float(lon), start, int(hours), names, seed)

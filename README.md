@@ -19,7 +19,7 @@
 ```bash
 python3 scripts/generate_forecast.py --no-grid   # 生成 public/data/forecast.json
 python3 scripts/serve.py                         # 打开 http://127.0.0.1:8080/
-python3 -m unittest discover -s tests -q         # 38 个测试，全部通过
+python3 -m unittest discover -s tests -q         # 84 个测试，全部通过
 ```
 
 首次只想离线看效果，可把第一条换成 `python3 scripts/generate_forecast.py --mock --no-grid`。
@@ -122,7 +122,39 @@ BCI 分档由 `grade_bci` 给出：`≥75 极佳`、`≥55 良好`、`≥35 一�
 
 公开函数包括 `condensation_level`、`detect_inversion`、`compute_sci`、`sea_potential`。
 
-### 4.4 合成管线 `core/pipeline.py`
+### 4.4 预计色彩 `core/physics/spectrum.py`
+
+纯标准库实现日出 / 日落直射光在 400–700 nm（每 10 nm）的透射谱，并转换为 sRGB 颜色，用于在单点剖析中展示"预计霞光色彩"。霞光照亮的是**云底**，所以光深必须从云层高度起算，而不是一路算到地面。物理链路如下：
+
+1. **光深起点在云层高度**：高云 8600 m、中云 5200 m、低云 1500 m（与 `burning_cloud.DECKS` 的气候值一致）。阳光从太空射向云底，只穿过云层以上的大气。若沿用 Kasten & Young 的平面平行空气质量把光算到地面，太阳高度 0° 时空气质量约 37.9、550 nm 透射率仅约 0.024，日落瞬间会被错误地压成接近全黑，而且无法表达"太阳已落到地平线以下、高云仍被点亮"的火烧云事实。
+2. **瑞利与气溶胶分别积分**：分别沿前向射线积分球面几何，`m_X = ∫ exp(-z/H_X)·ds/H_X`，其中 `z` 为海拔、`ds` 为路径元。瑞利（分子）标高 `H_R = 8000 m`，气溶胶标高 `H_A = 1500 m`。两者不能共用一个 Chapman 空气质量：Chapman 式只对高度尺度约 `R/2 ≈ 3200 km` 的整层柱成立，而气溶胶集中在 1.5 km 以下，8600 m 高云的光路里几乎没有气溶胶；共用会把 AOD 凭空放大一个量级，把日落压黑。`slant_airmass` 仅保留作快速粗估。
+3. **受光极限（地球本影）与软边**：由切线几何得 `α_min(h) = -sqrt(2h/R)`（弧度）。1500 m 约 -1.24°，5200 m 约 -2.31°，8600 m 约 -2.98°。真实太阳视半直径约 0.266°，本影边缘是渐变的，因此透射谱乘以 `smoothstep(α_min - 0.266°, α_min + 0.266°, α)`，避免亮度在本影边缘硬跳变。
+4. **瑞利散射**：550 nm 垂直光学厚度 `τ_R,550 = 0.098`，波长依赖为 `τ_R(λ) = τ_R,550·(λ/550)^-4.1`。蓝光被优先散射，太阳越低，透射光越红。
+5. **气溶胶米散射**：Ångström 幂律 `τ_A(λ) = AOD550·(λ/550)^-1.3`，指数取约 1.3。本步骤尚未接入 CAMS 气溶胶，AOD550 固定为中性假设值 `0.2`，输出字段 `color_aod_source = "assumed"`。
+6. **透射率**：`T(λ) = exp(-(τ_R(λ)·m_R + τ_A(λ)·m_A))·fade`；`m_R`、`m_A` 用各自标高从云层高度起算，射线撞地时返回 0。
+7. **配色**：CIE 1931 `x̄/ȳ/z̄` 使用 Wyman, Sloan & Shirley (2013) 的多瓣高斯解析近似；XYZ **直接**经标准 D65 矩阵转为 linear sRGB，gamma 编码并做 gamut 裁剪。不再先按 `Y=1` 归一化取色度再乘亮度，避免低太阳时暖色被灰化。
+8. **受光云层与画布**：按高 → 中 → 低顺序选择第一层云量 ≥ 10% 且仍高于自身受光极限的云层，用它的透射谱决定色度。亮度用 CIE `L*`：`clamp(canvas_strength(三层云量) · L*/100, 0, 1)`，其中 `L* = 116·Y^(1/3) - 16`（暗端用 `903.3·Y`）。只有画布强度 `canvas < 0.35` 时才按权重向中性灰蓝收拢；全部云层都进入本影时输出 `#000000` / 中性灰 / 亮度 0。
+
+逐时字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `color_hex` | string | `#rrggbb` 预计颜色 |
+| `color_name` | string | 中文色名：金黄 / 橙金 / 橙红 / 玫红 / 暗红 / 灰紫 / 中性灰 / 灰蓝 |
+| `color_brightness` | number | 0–1 感知亮度（两位小数） |
+| `color_rgb` | array | `[r, g, b]`，0–255 |
+| `color_aod_source` | string | 当前固定为 `"assumed"` |
+| `color_deck` | string / null | 受光云层：高云 / 中云 / 低云；无则为 `null` |
+| `color_deck_height_m` | number / null | 受光云层高度（m），无则为 `null` |
+
+已知局限：
+
+- **气溶胶垂直分布为单一标高近似**：AOD550 目前是固定假设值，气溶胶廓线按 1.5 km 标高指数衰减；真实霾、沙尘和火山气溶胶会显著改变颜色与亮度，后续接入 CAMS AOD 后应替换该假设。
+- **无云光学厚度**：云量只决定"有没有画布"和哪层云受光，未计算云滴 / 冰晶的光学厚度、多次散射与云体自身消光。
+- **直射光近似**：模型只算太阳直射光的透射谱，不含天空多次散射与气辉；真实低太阳霞光通常比该估算更亮、更弥散。
+- **色度近似**：CIE 配色函数为解析拟合，sRGB gamut 裁剪也会损失部分光谱色，颜色仅供氛围参考，不替代实拍或专业色度测量。
+
+### 4.5 合成管线 `core/pipeline.py`
 
 | 常量 | 值 | 含义 |
 | --- | ---: | --- |
@@ -132,7 +164,7 @@ BCI 分档由 `grade_bci` 给出：`≥75 极佳`、`≥55 良好`、`≥35 一�
 
 管线逐机位生成 96 小时序列、最佳日出 / 日落窗口、观赏状态与拍摄朝向建议，最后汇总为一份静态 JSON。
 
-### 4.5 地面观测降级 `_ground_obs`
+### 4.6 地面观测降级 `_ground_obs`
 
 任何一步失败都不会中断流程：
 
@@ -216,6 +248,8 @@ summary[]
 | `cloud_low` / `cloud_mid` / `cloud_high` | 低 / 中 / 高云量 |
 | `visibility_km` / `aqi` | 能见度与空气质量指数；无真实 AQI 时为 `null` |
 | `ground_source` / `wind_speed_10m` | 地面观测来源与 10 m 风速 |
+| `color_hex` / `color_name` / `color_brightness` / `color_rgb` | 预计霞光颜色、中文色名、0–1 亮度与 RGB |
+| `color_aod_source` | 气溶胶来源，当前固定为 `assumed` |
 
 ---
 
@@ -236,7 +270,8 @@ sky-forecast/
 │  │  ├─ __init__.py
 │  │  ├─ solar.py               # NOAA 太阳几何
 │  │  ├─ burning_cloud.py       # BCI
-│  │  └─ sea_of_clouds.py       # SCI
+│  │  ├─ sea_of_clouds.py       # SCI
+│  │  └─ spectrum.py            # 直射光透射谱与预计霞光颜色
 │  ├─ __init__.py
 │  └─ pipeline.py               # 合成管线
 ├─ public/
@@ -250,7 +285,8 @@ sky-forecast/
 ├─ tests/
 │  ├─ __init__.py
 │  ├─ test_physics.py
-│  └─ test_pipeline.py
+│  ├─ test_pipeline.py
+│  └─ test_spectrum.py
 ├─ .github/
 │  └─ workflows/
 │     └─ forecast.yml           # 生成并部署 GitHub Pages
@@ -335,7 +371,7 @@ curl -s "http://127.0.0.1:8077/api/forecast?hours=24&grid=0"
 
 ```bash
 python3 -m unittest discover -s tests -q
-# Ran 38 tests ... OK
+# Ran 84 tests ... OK
 ```
 
 测试位于 `tests/test_physics.py` 与 `tests/test_pipeline.py`；必要时可附加语法检查：
@@ -420,6 +456,7 @@ Pages 没有服务端，页脚的 `api/forecast` 在 Pages 上会 404；需要�
 - 页脚「实时 API」在 Pages 上返回 404，这是缺少服务端导致的预期行为。
 - 未配置 `QWEATHER_KEY` 时没有真实 AQI，气溶胶分量为中性，BCI 可能与有观测时略有差异。
 - 默认生成网格会增加 JSON 体积；页面不消费 `grid`，线上构建统一使用 `--no-grid`。
+- `color_*` 预计色彩使用固定 AOD550 假设值，且不含云光学厚度、多次散射和气溶胶垂直廓线，仅作氛围参考。
 - `github-pages` environment 在首次部署时由平台自动创建。
 
 ---
@@ -432,3 +469,58 @@ Pages 没有服务端，页脚的 `api/forecast` 在 Pages 上会 404；需要�
 - 前端 HTML / JS 不含任何密钥，数据只从同源静态 JSON 或同源 API 获取。
 - `.gitignore` 同时忽略 `public/data/*.json`、`.run/`、`__pycache__`、`.venv` 等本地产物。
 - 工作流权限保持最小化：`contents: read`、`pages: write`、`id-token: write`。
+
+---
+
+## 12. 多模式共识与配额成本
+
+生产路径在原有 33 变量单模式请求之外，额外发一次多模式请求，仅取三层云量：
+
+| 常量 | 值 |
+| --- | --- |
+| `CONSENSUS_MODELS` | `ecmwf_ifs025`, `gfs_seamless`, `icon_seamless` |
+| `CONSENSUS_VARIABLES` | `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high` |
+
+### 12.1 计费公式
+
+Open-Meteo 按成本而非请求数计费：
+
+```text
+每地点 cost = max(1.0, 模型数 × 变量数 / 10.0)
+```
+
+- 基线：33 变量 × 1 模型 = 3.30 / 地点，11 个机位合计 36.3 / 轮。
+- 共识：3 变量 × 3 模型 = 0.9，被下限抬到 1.0 / 地点，11 个机位合计 11.0 / 轮。
+- 合计约 47.3 / 轮；每日 12 轮约 568，占每日 10000 上限约 5.7%。
+- `forecast_days` 不影响成本；响应头 `x-ratelimit-cost` 可用于自检。
+
+### 12.2 共识字段
+
+逐时 `hourly[]` 新增（原有字段不变）：
+
+| 字段 | 说明 |
+| --- | --- |
+| `consensus.low/mid/high` | 每层四个来源（`best_match` + 三个独立模式）的 `values`、`available`、`mean`、`min`、`max`、`spread`、`stdev`、`agreement`、`level`、`cloud_prob`、`model_count` |
+| `consensus_score` | 三层一致度按低云 0.25 / 中云 0.35 / 高云 0.40 加权；缺失层剔除后重新归一 |
+
+一致度采用 `100 × max(0, 1 - spread / 60)` 的线性映射，避免云量接近 0 时相对量爆掉。有效来源少于 2 个时 `agreement` / `level` 为 `null`，并标注「有效模式不足」，绝不用单一来源伪造一致度。能参与共识的只有云量：`visibility` 仅 `best_match` 与 `gfs_seamless` 有值，另外两个模式全为 `null`。
+
+`meta.consensus_models` 记录本次实际启用的模式；共识请求失败时为空数组，主预报不受影响。前端数据源芯片按该字段点亮，详情面板在 8 项因子之后展示三层共识均值、离散度与一致度等级，并提供默认收起的各源云量矩阵。
+
+---
+
+## 13. 受光极限判据进入评分层
+
+BCI 的太阳高度闸门不再使用与云层高度无关的固定阈值。中/高云画布高度按云量加权
+
+```text
+h = (5200·cloud_mid + 8600·cloud_high) / (cloud_mid + cloud_high)   # 均为 0 时取 8600
+α_min = -sqrt(2h / R)                                              # R = 6371000 m
+```
+
+太阳低于画布自身的受光极限 `α_min` 时才算入本影；在 `α_min` 之上仍按满分处理。
+本影边缘用真实太阳视半直径 0.266° 做渐变，避免亮度在本影边缘硬跳变。
+`e >= 0` 的白天段数值与旧实现逐位一致。
+
+前端详情面板的「太阳高度角」副标题同步使用同一画布高度公式：`e < α_min` 时显示
+「已入本影·画布不受光」，仅改文案，数值、进度条与配色不变。
