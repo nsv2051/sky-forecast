@@ -72,7 +72,8 @@ _SNAPSHOT_LABELS = {
     "day3_sunrise": "后天日出",
     "day3_sunset": "后天日落",
 }
-_EVENT_ICON = {"sunrise": "🌅", "sunset": "🌇"}
+# 图标由前端内联 SVG 渲染；保留 icon 字段以维持 JSON 结构兼容，值置空。
+_EVENT_ICON = {"sunrise": "", "sunset": ""}
 
 # Cover the central-western Henan Funiu mountains and surroundings.
 GRID_BOUNDS = {
@@ -760,7 +761,7 @@ def golden_snapshot_windows(center_lat: float, center_lon: float, start: datetim
                     "day_offset": offset,
                     "event": event,
                     "label": _SNAPSHOT_LABELS.get(key, key),
-                    "icon": _EVENT_ICON.get(event, "🕐"),
+                    "icon": _EVENT_ICON.get(event, ""),
                     "local_date": local_day.isoformat(),
                     "weekday": _WEEKDAYS[local_day.weekday()],
                     "instant": instant,

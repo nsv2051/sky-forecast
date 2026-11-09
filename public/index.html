@@ -118,6 +118,7 @@
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
+  .ico { display: inline-block; vertical-align: -0.15em; flex: none; }
   html { -webkit-text-size-adjust: 100%; }
 
   body {
@@ -274,7 +275,7 @@
   }
   .slot { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 0.5px solid var(--separator); }
   .slot:first-of-type { margin-top: var(--space-3); }
-  .slot-icon { font-size: 20px; width: 30px; text-align: center; flex: none; }
+  .slot-icon { font-size: 20px; width: 30px; display: flex; align-items: center; justify-content: center; flex: none; }
   .slot-body { min-width: 0; flex: 1; }
   .slot-label { font-size: 12px; color: var(--text-3-ink); font-weight: 560; }
   .slot-main { font-size: 14px; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -379,7 +380,7 @@
     background: linear-gradient(120deg, var(--surface-2), transparent);
   }
   .detail-head .dh-name { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-  .detail-head .dh-meta { font-size: 12.5px; color: var(--text-3-ink); }
+  .detail-head .dh-meta { font-size: 12.5px; color: var(--text-3-ink); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
   .detail-head .dh-snap {
     margin-left: auto; font-size: 11.5px; font-weight: 640; color: var(--accent-ink);
     background: var(--accent-soft); padding: 5px 11px; border-radius: 999px; white-space: nowrap;
@@ -403,6 +404,14 @@
     .detail-cols .dcol { display: flex; flex-direction: column; }
     .detail-cols .dcol-right { justify-content: flex-start; }
   }
+
+  /* 宽屏：时间轴提升为两列之后的全宽横条，压缩内外留白以保持卡片高度平衡。 */
+  @media (min-width: 1180px) {
+    .detail-cols { padding-bottom: 0; }
+    .detail-card > .timeline-block { padding-top: var(--space-1); padding-bottom: var(--space-1); }
+    .detail-card > .timeline-block:last-child { padding-bottom: var(--space-1); }
+  }
+  .timeline-block .pb-title { margin-bottom: 6px; }
 
   /* ---------------- Compact spot cards ---------------- */
   .spot-grades { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
@@ -544,7 +553,6 @@
     .ov-day { padding-left: 4px; padding-right: 4px; }
     .ov-day .s { font-size: 11px; }
     .ov-times { display: none; }
-    .compact-dec-strip .cds-reasons { white-space: normal; overflow: visible; text-overflow: clip; }
     .compact-dec-strip { align-items: flex-start; }
     .cds-right { padding-top: 1px; }
   }
@@ -596,7 +604,7 @@
   .cds-tag { font-size: 14.5px; font-weight: 750; letter-spacing: -0.01em; }
   .cds-score { font-size: 12px; opacity: 1; margin-left: 6px; font-weight: 600; }
   .cds-dual { display: inline-flex; align-items: baseline; gap: 8px; margin-left: 8px; }
-  .cds-idx { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cds-idx { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
   .cds-idx b { font-weight: 800; }
   .cds-idx.is-lead { opacity: 1; }
   .cds-idx.is-sub { opacity: 0.68; }
@@ -605,15 +613,11 @@
     font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
     background: rgba(255,255,255,0.22); color: inherit;
   }
-  .cds-reasons { font-size: 11px; opacity: 0.96; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cds-right { text-align: right; flex: none; display: flex; flex-direction: column; align-items: flex-end; }
   .cds-prob { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
   .cds-cap { font-size: 11px; opacity: 0.95; margin-top: 2px; }
 
-  /* 窄屏允许云量行折行，避免在 390–430px 区间被 ellipsis 截断。
-     必须放在上面的基础规则之后，否则同优先级会被后者覆盖。 */
   @media (max-width: 560px) {
-    .cds-reasons { white-space: normal; overflow: visible; text-overflow: clip; }
     .compact-dec-strip { align-items: flex-start; }
     .cds-dual { gap: 6px; margin-left: 6px; }
     .cds-idx { font-size: 11.5px; }
@@ -644,12 +648,36 @@
   .pro-v small { font-size: 11px; font-weight: 600; opacity: 0.7; }
   .pro-bar { height: 3px; border-radius: 999px; background: var(--separator); overflow: hidden; margin-top: 5px; }
   .pro-bar > i { display: block; height: 100%; border-radius: 999px; }
+  .pro-groups { display: flex; flex-direction: column; gap: var(--space-3); }
+  .pro-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .pro-group.is-narrow .pro-grid { grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 1180px) {
+    .pro-groups { flex-direction: row; align-items: flex-start; gap: var(--space-2); }
+    .pro-group { flex: 1 1 0; }
+    .pro-group.is-primary { flex: 2.05 1 0; }
+    .pro-group.is-narrow { flex: 0.9 1 0; }
+    .pro-group.is-gate .pro-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  .pro-group-title {
+    font-size: 11.5px; font-weight: 650; color: var(--text-2); letter-spacing: 0.02em;
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .pro-group.is-primary .pro-group-title { color: var(--text); font-weight: 760; font-size: 12px; }
+  .pro-group-weight { font-size: 10.5px; font-weight: 600; color: var(--text-3-ink); }
+  .dcol-left .panel-block .pb-title { margin-bottom: 6px; }
+  .dcol-left .panel-block + .panel-block { padding-top: 4px; }
+  .dcol-left .conf-row { margin-top: 8px; }
+  .pro-sub {
+    font-size: 10.5px; color: var(--text-3-ink); margin-top: 4px;
+    font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 
   /* ---------------- Multi-model consensus ---------------- */
   .consensus-sources { margin-top: 10px; }
   .consensus-sources > summary {
     list-style: none; cursor: pointer; padding: 6px 0;
     font-size: 12px; font-weight: 600; color: var(--text-2);
+    display: flex; align-items: center; gap: 5px;
   }
   .consensus-sources > summary::-webkit-details-marker { display: none; }
   .consensus-sources > summary::before { content: "\25B8 "; color: var(--text-3-ink); }
@@ -709,7 +737,7 @@
     min-width: 0; background: var(--surface-2); border: 0.5px solid var(--border);
     border-radius: var(--radius-sm); padding: 9px 10px;
   }
-  .conf-cell .ck { font-size: 11px; color: var(--text-3-ink); font-weight: 560; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conf-cell .ck { font-size: 11px; color: var(--text-3-ink); font-weight: 560; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
   .conf-cell .cv { font-size: 15px; font-weight: 760; font-variant-numeric: tabular-nums; margin-top: 2px; letter-spacing: -0.02em; line-height: 1.15; }
   .conf-cell .cv small { font-size: 11px; font-weight: 600; opacity: 0.7; }
   .conf-cell .cg { font-size: 11px; color: var(--text-2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -734,7 +762,7 @@
   .skel { border-radius: var(--radius-md); background: linear-gradient(100deg, var(--surface-2) 30%, color-mix(in srgb, var(--surface-2) 45%, transparent) 50%, var(--surface-2) 70%); background-size: 220% 100%; animation: shimmer 1.3s infinite; }
   @keyframes shimmer { to { background-position: -220% 0; } }
   .empty { padding: var(--space-6) var(--space-4); text-align: center; color: var(--text-3-ink); }
-  .empty .big { font-size: 34px; margin-bottom: var(--space-3); }
+  .empty .big { margin-bottom: var(--space-3); display: flex; justify-content: center; line-height: 0; }
 
   /* ---------------- Footer ---------------- */
   footer { margin: var(--space-7) 0 var(--space-6); }
@@ -863,6 +891,67 @@
       if (cls) node.className = cls;
       if (text != null) node.textContent = text;
       return node;
+    }
+
+    /* Inline SVG icon set. Stroke-only, 24x24 grid, inherits currentColor.
+       Keep every glyph to a few strokes so it stays legible at 12–16px. */
+    var SVG_NS = "http://www.w3.org/2000/svg";
+    var ICON_PATHS = {
+      sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>',
+      layers: '<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/>',
+      corridor: '<path d="M4 20 9 4"/><path d="M20 20 15 4"/><path d="M12 4v3M12 11v3M12 18v2"/>',
+      compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.1 5-5 2.1 2.1-5 5-2.1Z"/>',
+      highCloud: '<path d="M4 7c2.5-2 5-2 7.5 0s5 2 7.5 0"/><path d="M3 12c2.5-2 5-2 7.5 0s5 2 7.5 0"/><path d="M6 17c2-1.5 4-1.5 6 0s4 1.5 6 0"/>',
+      midCloud: '<path d="M6 12a4 4 0 0 1 7.5-1.5A3 3 0 0 1 18 16H6a2.5 2.5 0 0 1 0-5Z"/><path d="M8 20h8"/>',
+      lowCloud: '<path d="M6 10a4 4 0 0 1 7.5-1.5A3 3 0 0 1 18 14H6a2.5 2.5 0 0 1 0-5Z"/><path d="M3 19h18"/>',
+      visibility: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/>',
+      target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+      palette: '<path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h4a4 4 0 0 0 4-4c0-3.3-3.6-6-8-6Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14" cy="7.5" r="1"/><circle cx="16.5" cy="11" r="1"/>',
+      gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/>',
+      calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+      thermometer: '<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0Z"/><path d="M12 9v6"/>',
+      wind: '<path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h15a3 3 0 1 1-3 3"/><path d="M3 16h7"/>',
+      mountain: '<path d="m3 20 6-11 4 7 2-3 6 7H3Z"/><path d="m7.5 13 1.5 1 1.5-1"/>',
+      flame: '<path d="M12 21a6 6 0 0 0 6-6c0-4-3-6-4-9 0 2-1 3-2 4 0-2-1-4-2-6-1 3-4 6-4 11a6 6 0 0 0 6 6Z"/><path d="M12 18a2.5 2.5 0 0 0 2.5-2.5c0-1.5-1.5-2.5-2.5-4-1 1.5-2.5 2.5-2.5 4A2.5 2.5 0 0 0 12 18Z"/>',
+      cloud: '<path d="M6 17a4 4 0 0 1 .5-8 5 5 0 0 1 9.5 1.5A3.5 3.5 0 0 1 18 17H6Z"/>',
+      blueHour: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>',
+      dawn: '<path d="M12 3v4M9 6l3-3 3 3M3 18h18"/><path d="M7 18a5 5 0 0 1 10 0"/>',
+      dusk: '<path d="M12 7v4M9 8l3 3 3-3M3 18h18"/><path d="M7 18a5 5 0 0 1 10 0"/>',
+      sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/><path d="M19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7L19 16Z"/>',
+      warning: '<path d="M10.3 4.3 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
+      rank1: '<circle cx="12" cy="12" r="9"/>',
+      rank2: '<circle cx="12" cy="12" r="9"/>',
+      rank3: '<circle cx="12" cy="12" r="9"/>',
+      dot: '<circle cx="12" cy="12" r="4"/>'
+    };
+
+    function iconEl(name, size) {
+      var s = size == null ? 16 : size;
+      var svg = document.createElementNS(SVG_NS, "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("width", s);
+      svg.setAttribute("height", s);
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("stroke", "currentColor");
+      svg.setAttribute("stroke-width", "1.9");
+      svg.setAttribute("stroke-linecap", "round");
+      svg.setAttribute("stroke-linejoin", "round");
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("class", "ico");
+      svg.innerHTML = ICON_PATHS[name] || ICON_PATHS.dot;
+      if (/^rank[123]$/.test(name)) {
+        var digit = document.createElementNS(SVG_NS, "text");
+        digit.setAttribute("x", "12");
+        digit.setAttribute("y", "16.2");
+        digit.setAttribute("text-anchor", "middle");
+        digit.setAttribute("font-size", "11");
+        digit.setAttribute("font-weight", "700");
+        digit.setAttribute("fill", "currentColor");
+        digit.setAttribute("stroke", "none");
+        digit.textContent = name.slice(4);
+        svg.appendChild(digit);
+      }
+      return svg;
     }
 
     function fmtUpdated(iso) {
@@ -1087,12 +1176,13 @@
       return pill;
     }
 
-    var MEDALS = ["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"];
-
-    /* One ranked spot row inside a day card. */
+    /* One ranked spot row inside a day card. Top three get a numbered ring badge. */
     function renderPick(rank, pick) {
       var row = el("div", "slot");
-      row.appendChild(el("div", "slot-icon", MEDALS[rank] || String(rank + 1)));
+      var slotIcon = el("div", "slot-icon");
+      if (rank < 3) slotIcon.appendChild(iconEl("rank" + (rank + 1), 18));
+      else slotIcon.appendChild(document.createTextNode(String(rank + 1)));
+      row.appendChild(slotIcon);
       var body = el("div", "slot-body");
       body.appendChild(el("div", "slot-main", pick.spot.name + " \u00b7 " + pick.time));
       body.appendChild(el("div", "slot-sub",
@@ -1111,7 +1201,9 @@
       var dates = forecastDates(data);
       if (!dates.length) {
         var e = el("div", "empty");
-        e.appendChild(el("div", "big", "\u2601\uFE0F"));
+        var big = el("div", "big");
+        big.appendChild(iconEl("cloud", 32));
+        e.appendChild(big);
         e.appendChild(el("div", null, "\u6682\u65e0\u53ef\u7528\u7a97\u53e3"));
         box.appendChild(e);
         return;
@@ -1324,7 +1416,7 @@
       events.forEach(function (ev) {
         var opt = document.createElement("option");
         opt.value = ev.id;
-        opt.textContent = "\uD83D\uDCC5 " + ev.text;
+        opt.textContent = ev.text;
         sel.appendChild(opt);
       });
       var current = resolveEvent(spot);
@@ -1556,15 +1648,15 @@
       var st = calcSunTimes(spot.lat, spot.lon, dayObj);
       var items = [];
       if (ev.kind === "sunrise") {
-        items.push({ t: formatMin(st.sunriseMin - 24), label: "蓝调时刻", icon: "\uD83C\uDF06", tone: "blue", desc: "破晓前冷蓝" });
-        items.push({ t: formatMin(st.sunriseMin - 10), label: "晨光破晓", icon: "\uD83C\uDF05", tone: "touch", desc: "东方露白" });
-        items.push({ t: formatMin(st.sunriseMin), label: "日出触地", icon: "\uD83D\uDD25", tone: "peak", desc: "第一缕晨光" });
-        items.push({ t: formatMin(st.sunriseMin + 20), label: "黄金时刻", icon: "\u2728", tone: "golden", desc: "金黄侧逆光" });
+        items.push({ t: formatMin(st.sunriseMin - 24), label: "蓝调时刻", icon: "blueHour", tone: "blue", desc: "破晓前冷蓝" });
+        items.push({ t: formatMin(st.sunriseMin - 10), label: "晨光破晓", icon: "dawn", tone: "touch", desc: "东方露白" });
+        items.push({ t: formatMin(st.sunriseMin), label: "日出触地", icon: "flame", tone: "peak", desc: "第一缕晨光" });
+        items.push({ t: formatMin(st.sunriseMin + 20), label: "黄金时刻", icon: "sparkle", tone: "golden", desc: "金黄侧逆光" });
       } else {
-        items.push({ t: formatMin(st.sunsetMin - 30), label: "黄金时刻", icon: "\u2728", tone: "golden", desc: "侧逆光暖调" });
-        items.push({ t: formatMin(st.sunsetMin), label: "日落触地", icon: "\uD83C\uDF05", tone: "touch", desc: "太阳落入地平线" });
-        items.push({ t: formatMin(st.sunsetMin + 8), label: "点燃巅峰", icon: "\uD83D\uDD25", tone: "peak", desc: "核心爆发期 约9分钟" });
-        items.push({ t: formatMin(st.sunsetMin + 24), label: "蓝调时刻", icon: "\uD83C\uDF06", tone: "blue", desc: "深蓝冷暖反差" });
+        items.push({ t: formatMin(st.sunsetMin - 30), label: "黄金时刻", icon: "sparkle", tone: "golden", desc: "侧逆光暖调" });
+        items.push({ t: formatMin(st.sunsetMin), label: "日落触地", icon: "dusk", tone: "touch", desc: "太阳落入地平线" });
+        items.push({ t: formatMin(st.sunsetMin + 8), label: "点燃巅峰", icon: "flame", tone: "peak", desc: "核心爆发期 约9分钟" });
+        items.push({ t: formatMin(st.sunsetMin + 24), label: "蓝调时刻", icon: "blueHour", tone: "blue", desc: "深蓝冷暖反差" });
       }
       return items;
     }
@@ -1669,53 +1761,53 @@
 
       return [
         {
-          k: "太阳高度角", icon: "☀️", v: e == null ? "—" : e.toFixed(1), unit: e == null ? "" : "°",
+          k: "太阳高度角", icon: "sun", v: e == null ? "—" : e.toFixed(1), unit: e == null ? "" : "°",
           g: sunG, pct: spct,
           c: toneColor(spct, 70, 45),
           ink: toneInk(spct, 70, 45)
         },
         {
-          k: "画布质量", icon: "🎨", v: String(Math.round(cloud * 100)), unit: "分",
+          k: "画布质量", icon: "layers", v: String(Math.round(cloud * 100)), unit: "分",
           g: cloud * 100 >= 70 ? "优质透光画布" : cloud * 100 >= 45 ? "可用画布" : cloud * 100 >= 25 ? "画布偏薄" : "几乎无画布",
           pct: cloudPct,
           c: toneColor(cloudPct, 70, 45),
           ink: toneInk(cloudPct, 70, 45)
         },
         {
-          k: "进光廊道", icon: "🛣️", v: String(corridor), unit: "%",
+          k: "进光廊道", icon: "corridor", v: String(corridor), unit: "%",
           g: dir + "向 · " + (corridor >= 70 ? "通畅" : corridor >= 45 ? "局部遮挡" : "受阻"),
           pct: corridor,
           c: toneColor(corridor, 70, 45),
           ink: toneInk(corridor, 70, 45)
         },
         {
-          k: "落位偏差", icon: "🧭", v: dAz == null ? "—" : String(Math.round(dAz)), unit: dAz == null ? "" : "°",
+          k: "落位偏差", icon: "compass", v: dAz == null ? "—" : String(Math.round(dAz)), unit: dAz == null ? "" : "°",
           g: dAzG, pct: dAzPct,
           c: toneColor(dAzPct, 70, 45),
           ink: toneInk(dAzPct, 70, 45)
         },
         {
-          k: "高空卷云", icon: "🌤️", v: String(Math.round(ch)), unit: "%",
+          k: "高空卷云", icon: "highCloud", v: String(Math.round(ch)), unit: "%",
           g: ch >= 85 ? "死白无光" : ch >= 30 ? "散布适中" : "晴空无幕", pct: clamp(ch, 0, 100),
           c: ch >= 85 ? "var(--bad)" : ch >= 30 ? "var(--good)" : "var(--fair)",
           ink: ch >= 85 ? "var(--bad-ink)" : ch >= 30 ? "var(--good-ink)"
             : toneInk(ch, 30, -1, "var(--fair-ink)")
         },
         {
-          k: "中云灰幕", icon: "🌫️", v: String(Math.round(cm)), unit: "%",
+          k: "中云灰幕", icon: "midCloud", v: String(Math.round(cm)), unit: "%",
           g: cm > 70 && ch < 50 ? "灰板挡光" : cm > 70 ? "厚云压光" : cm >= 30 ? "承接掠射" : "稀薄无害",
           pct: clamp(100 - cm, 0, 100),
           c: cm > 70 ? "var(--bad)" : toneColor(100 - cm, 70, 45),
           ink: cm > 70 ? "var(--bad-ink)" : toneInk(100 - cm, 70, 45)
         },
         {
-          k: "本地低云", icon: "☁️", v: String(Math.round(cl)), unit: "%",
+          k: "本地低云", icon: "lowCloud", v: String(Math.round(cl)), unit: "%",
           g: cl <= 25 ? "通透安全" : cl <= 50 ? "低空微遮" : "低云黑墙", pct: clamp(100 - cl, 0, 100),
           c: toneColor(100 - cl, 75, 50),
           ink: toneInk(100 - cl, 75, 50)
         },
         {
-          k: "大气能见度", icon: "🔭", v: String(Math.round(vis)), unit: "km",
+          k: "大气能见度", icon: "visibility", v: String(Math.round(vis)), unit: "km",
           g: vis >= 20 ? "通透水晶" : vis >= 10 ? "视线良好" : "轻雾遮蔽", pct: clamp(vis * 3.3, 0, 100),
           c: toneColor(vis, 20, 10),
           ink: toneInk(vis, 20, 10)
@@ -1732,14 +1824,20 @@
       });
       var leadVal = wp ? wp.lead : 0;
       var block = el("div", "panel-block");
-      block.appendChild(el("div", "pb-title", "🎯 出工胜算"));
+      var title = el("div", "pb-title");
+      title.appendChild(iconEl("target", 14));
+      title.appendChild(document.createTextNode("出工胜算"));
+      block.appendChild(title);
       var row = el("div", "conf-row");
 
       var days = stab ? stab.days : null;
       var total = stab ? stab.total : 3;
       var pct = days == null || !total ? 0 : Math.round(days / total * 100);
       var c1 = el("div", "conf-cell");
-      c1.appendChild(el("div", "ck", "🎯 三日达标"));
+      var ck1 = el("div", "ck");
+      ck1.appendChild(iconEl("target", 12));
+      ck1.appendChild(document.createTextNode("三日达标"));
+      c1.appendChild(ck1);
       var v1 = el("div", "cv");
       if (days == null) v1.textContent = "—";
       else v1.innerHTML = days + "<small> / " + total + " 天</small>";
@@ -1768,7 +1866,10 @@
       var inv = h.inversion_strength != null ? num(h.inversion_strength) : null;
       var invH = h.inversion_height_m != null ? num(h.inversion_height_m) : null;
       var c2 = el("div", "conf-cell");
-      c2.appendChild(el("div", "ck", "\uD83C\uDF2B\uFE0F \u9006\u6E29\u5F3A\u5EA6"));
+      var ck2 = el("div", "ck");
+      ck2.appendChild(iconEl("thermometer", 12));
+      ck2.appendChild(document.createTextNode("\u9006\u6E29\u5F3A\u5EA6"));
+      c2.appendChild(ck2);
       var v2 = el("div", "cv");
       if (inv == null) v2.textContent = "\u2014";
       else v2.innerHTML = inv.toFixed(1) + "<small> \u2103</small>";
@@ -1782,7 +1883,10 @@
 
       var wind = h.wind_speed_10m != null ? num(h.wind_speed_10m) : null;
       var c3 = el("div", "conf-cell");
-      c3.appendChild(el("div", "ck", "\uD83D\uDCA8 \u5730\u9762\u98CE\u901F"));
+      var ck3 = el("div", "ck");
+      ck3.appendChild(iconEl("wind", 12));
+      ck3.appendChild(document.createTextNode("\u5730\u9762\u98CE\u901F"));
+      c3.appendChild(ck3);
       var v3 = el("div", "cv");
       if (wind == null) v3.textContent = "\u2014";
       else v3.innerHTML = wind.toFixed(1) + "<small> m/s</small>";
@@ -1806,7 +1910,10 @@
       else if (fallback && fallback.color_hex) src = fallback;
       if (!src) return null;
       var block = el("div", "panel-block color-block");
-      block.appendChild(el("div", "pb-title", "🎨 预计霞光色彩"));
+      var headTitle = el("div", "pb-title");
+      headTitle.appendChild(iconEl("palette", 14));
+      headTitle.appendChild(document.createTextNode("预计霞光色彩"));
+      block.appendChild(headTitle);
       var row = el("div", "color-row");
       var swatch = el("span", "color-swatch");
       swatch.style.background = src.color_hex;
@@ -1839,6 +1946,31 @@
       return block;
     }
 
+    function proCellEl(c) {
+      var cell = el("div", "pro-cell");
+      var key = el("div", "pro-k");
+      key.appendChild(iconEl(c.icon, 13));
+      key.appendChild(document.createTextNode(c.k));
+      cell.appendChild(key);
+      var v = el("div", "pro-v");
+      var b = el("b", null, c.v);
+      if (c.ink) b.style.color = c.ink;
+      v.appendChild(b);
+      var em = el("em", null, c.unit ? c.unit + (c.g ? " · " + c.g : "") : c.g);
+      v.appendChild(em);
+      cell.appendChild(v);
+      if (c.sub) cell.appendChild(el("div", "pro-sub", c.sub));
+      if (!c.noBar && c.pct != null) {
+        var bar = el("div", "pro-bar");
+        var i = el("i");
+        i.style.width = clamp(c.pct, 0, 100) + "%";
+        i.style.background = c.c || "var(--accent)";
+        bar.appendChild(i);
+        cell.appendChild(bar);
+      }
+      return cell;
+    }
+
     function proGridBlock(title, tagText, cells) {
       var block = el("div", "panel-block");
       var t = el("div", "pb-title");
@@ -1846,36 +1978,68 @@
       if (tagText) t.appendChild(el("span", "tag", tagText));
       block.appendChild(t);
       var grid = el("div", "pro-grid");
-      cells.forEach(function (c) {
-        var cell = el("div", "pro-cell");
-        cell.appendChild(el("div", "pro-k", c.icon + " " + c.k));
-        var v = el("div", "pro-v");
-        var b = el("b", null, c.v);
-        if (c.ink) b.style.color = c.ink;
-        v.appendChild(b);
-        var em = el("em", null, c.unit ? c.unit + (c.g ? " · " + c.g : "") : c.g);
-        v.appendChild(em);
-        cell.appendChild(v);
-        if (c.pct != null) {
-          var bar = el("div", "pro-bar");
-          var i = el("i");
-          i.style.width = clamp(c.pct, 0, 100) + "%";
-          i.style.background = c.c || "var(--accent)";
-          bar.appendChild(i);
-          cell.appendChild(bar);
-        }
-        grid.appendChild(cell);
-      });
+      cells.forEach(function (c) { grid.appendChild(proCellEl(c)); });
       block.appendChild(grid);
+      return block;
+    }
+
+    function consensusSubline(c) {
+      if (!c) return "";
+      var n = c.available != null ? c.available : c.model_count;
+      var parts = [];
+      if (n != null) parts.push(Math.round(num(n)) + "\u6E90");
+      if (c.mean != null) parts.push(Math.round(num(c.mean)) + "%");
+      var out = parts.join(" ");
+      if (c.level) {
+        out += (out ? " \u00B7 " : "") + "\u4E00\u81F4\u5EA6 " + c.level;
+        if (c.agreement != null) out += "(" + Math.round(num(c.agreement)) + ")";
+      } else if (c.agreement != null) out += (out ? " \u00B7 " : "") + "\u4E00\u81F4\u5EA6 " + Math.round(num(c.agreement));
+      return out;
+    }
+
+    function proGroupedBlock(iconName, title, tagText, groups) {
+      var block = el("div", "panel-block");
+      var t = el("div", "pb-title");
+      if (iconName) t.appendChild(iconEl(iconName, 14));
+      t.appendChild(document.createTextNode(title));
+      if (tagText) t.appendChild(el("span", "tag", tagText));
+      block.appendChild(t);
+      var wrap = el("div", "pro-groups");
+      groups.forEach(function (g) {
+        var grp = el("div", "pro-group" + (g.primary ? " is-primary" : "") +
+          (g.narrow ? " is-narrow" : "") + (g.gate ? " is-gate" : ""));
+        var head = el("div", "pro-group-title");
+        head.appendChild(document.createTextNode(g.label));
+        if (g.meta) head.appendChild(el("span", "pro-group-weight", g.meta));
+        grp.appendChild(head);
+        var grid = el("div", "pro-grid");
+        g.cells.forEach(function (c) {
+          if (!c) return;
+          var cc = {};
+          for (var k in c) {
+            if (Object.prototype.hasOwnProperty.call(c, k)) cc[k] = c[k];
+          }
+          if (g.con && g.con[c.k]) {
+            var sub = consensusSubline(g.con[c.k]);
+            if (sub) cc.sub = sub;
+          }
+          if (g.noBar) cc.noBar = true;
+          grid.appendChild(proCellEl(cc));
+        });
+        grp.appendChild(grid);
+        if (g.after) grp.appendChild(g.after);
+        wrap.appendChild(grp);
+      });
+      block.appendChild(wrap);
       return block;
     }
 
     function consensusCells(entry) {
       var con = (entry && entry.consensus) || {};
       var defs = [
-        { key: "low", name: "低云", icon: "☁️" },
-        { key: "mid", name: "中云", icon: "🌫️" },
-        { key: "high", name: "高云", icon: "🌤️" }
+        { key: "low", name: "低云", icon: "lowCloud" },
+        { key: "mid", name: "中云", icon: "midCloud" },
+        { key: "high", name: "高云", icon: "highCloud" }
       ];
       return defs.map(function (d) {
         var c = con[d.key] || {};
@@ -1899,16 +2063,18 @@
       });
     }
 
-    function consensusBlock(entry) {
+    function consensusSourcesEl(entry) {
       if (!entry || !entry.consensus) return null;
-      var block = proGridBlock("🧩 模式共识", "多源", consensusCells(entry));
       var det = el("details", "consensus-sources");
-      det.appendChild(el("summary", null, "各源云量矩阵"));
+      var summary = el("summary");
+      summary.appendChild(iconEl("layers", 13));
+      summary.appendChild(document.createTextNode("\u5404\u6E90\u4E91\u91CF\u77E9\u9635"));
+      det.appendChild(summary);
       var con = entry.consensus || {};
       [
-        { key: "low", name: "低云" },
-        { key: "mid", name: "中云" },
-        { key: "high", name: "高云" }
+        { key: "low", name: "\u4F4E\u4E91" },
+        { key: "mid", name: "\u4E2D\u4E91" },
+        { key: "high", name: "\u9AD8\u4E91" }
       ].forEach(function (d) {
         var card = el("div", "cs-card");
         card.appendChild(el("div", "cs-layer", d.name));
@@ -1916,35 +2082,38 @@
         var c = con[d.key] || {};
         var values = c.values || {};
         [
-          { label: "最佳", value: values.best_match },
+          { label: "\u6700\u4F73", value: values.best_match },
           { label: "ECMWF", value: values.ecmwf_ifs025 },
           { label: "GFS", value: values.gfs_seamless },
           { label: "ICON", value: values.icon_seamless },
-          { label: "共识", value: c.mean, consensus: true }
+          { label: "\u5171\u8BC6", value: c.mean, consensus: true }
         ].forEach(function (item) {
           var cell = el("div", "cs-cell" + (item.consensus ? " cs-consensus" : ""));
           cell.appendChild(el("div", "ck", item.label));
           cell.appendChild(el("div", "cv",
-            item.value == null ? "—" : Math.round(num(item.value)) + "%"));
+            item.value == null ? "\u2014" : Math.round(num(item.value)) + "%"));
           row.appendChild(cell);
         });
         card.appendChild(row);
         det.appendChild(card);
       });
-      block.appendChild(det);
-      return block;
+      return det;
     }
 
     function timelineBlock(spot) {
       var items = buildTimeline(spot);
       if (items.length < 2) return null;
       var ev = resolveEvent(spot);
-      var block = el("div", "panel-block");
-      block.appendChild(el("div", "pb-title", "\uD83D\uDCC5 出工实战时刻" + (ev ? " \u00b7 " + ev.text : "")));
+      var block = el("div", "panel-block timeline-block");
+      var title = el("div", "pb-title");
+      title.appendChild(iconEl("calendar", 14));
+      title.appendChild(document.createTextNode("出工实战时刻" + (ev ? " \u00b7 " + ev.text : "")));
+      block.appendChild(title);
       var tl = el("div", "timeline");
       items.forEach(function (it) {
         var item = el("div", "tl-item");
-        var dot = el("div", "tl-dot " + it.tone, it.icon);
+        var dot = el("div", "tl-dot " + it.tone);
+        dot.appendChild(iconEl(it.icon, 12));
         item.appendChild(dot);
         item.appendChild(el("div", "tl-time", it.t));
         item.appendChild(el("div", "tl-label", it.label));
@@ -2102,11 +2271,12 @@
         " 个机位 · 未来三天 · 每格依次为日出 BCI / 日落 BCI / 云海 SCI，满分 100";
     }
 
-    function gradePill(label, value, grade, color, dateStr) {
+    function gradePill(iconName, label, value, grade, color, dateStr) {
       var p = el("span", "spot-grade");
       var dot = el("span", "dot");
       dot.style.background = color;
       p.appendChild(dot);
+      if (iconName) p.appendChild(iconEl(iconName, 12));
       p.appendChild(document.createTextNode(label + " "));
       p.appendChild(el("b", null, String(value)));
       if (grade) p.appendChild(document.createTextNode(" · " + grade));
@@ -2141,13 +2311,16 @@
       var head = el("div", "detail-head");
       var nameWrap = el("div");
       nameWrap.appendChild(el("div", "dh-name", spot.name));
-      nameWrap.appendChild(el("div", "dh-meta", "⛰️ " + spot.elevation_m + " m · " +
+      var meta = el("div", "dh-meta");
+      meta.appendChild(iconEl("mountain", 13));
+      meta.appendChild(document.createTextNode(spot.elevation_m + " m · " +
         (spot.region || "") + " · " +
         (status.weather_text || (spot.ground && spot.ground.text) || "—")));
+      nameWrap.appendChild(meta);
       var headGrades = el("div", "spot-grades");
-      headGrades.appendChild(gradePill("🔥 火烧云", Math.round(wp.bci),
+      headGrades.appendChild(gradePill("flame", "火烧云", Math.round(wp.bci),
         (wp.row && wp.row.bci_grade) || "", bciColor(wp.bci)));
-      headGrades.appendChild(gradePill("☁️ 云海", Math.round(wp.sci), sciStatus, "#0a84ff"));
+      headGrades.appendChild(gradePill("cloud", "云海", Math.round(wp.sci), sciStatus, "#0a84ff"));
       nameWrap.appendChild(headGrades);
       head.appendChild(nameWrap);
       head.appendChild(el("span", "decision-tag " + verdict.tone, verdict.label));
@@ -2157,15 +2330,13 @@
       var ev = resolveEvent(spot);
       var win = hourlyAtEvent(spot, ev) || (isFire ? (spot.best_evening || spot.best_morning || {}) : (spot.best_sea || {}));
       var stab = stableDays(spot, isFire ? "bci" : "sci");
-      function pick(k) {
-        if (win && win[k] != null) return win[k];
-        if (current && current[k] != null) return current[k];
-        return null;
-      }
 
       var decBlock = el("div", "panel-block");
-      decBlock.style.paddingTop = "10px";
-      decBlock.appendChild(el("div", "pb-title", "🎯 出工决断"));
+      decBlock.style.paddingTop = "4px";
+      var decTitle = el("div", "pb-title");
+      decTitle.appendChild(iconEl("target", 14));
+      decTitle.appendChild(document.createTextNode("出工决断"));
+      decBlock.appendChild(decTitle);
       
       var decStrip = el("div", "compact-dec-strip " + verdict.tone);
       var dsLeft = el("div", "cds-left");
@@ -2174,10 +2345,10 @@
       var sciRound = Math.round(wp.sci);
       var dual = el("span", "cds-dual");
       var fireIdx = el("span", "cds-idx " + (isFire ? "is-lead" : "is-sub"));
-      fireIdx.appendChild(document.createTextNode("\uD83D\uDD25 "));
+      fireIdx.appendChild(iconEl("flame", 12));
       fireIdx.appendChild(el("b", null, String(bciRound)));
       var seaIdx = el("span", "cds-idx " + (isFire ? "is-sub" : "is-lead"));
-      seaIdx.appendChild(document.createTextNode("\u2601\uFE0F "));
+      seaIdx.appendChild(iconEl("cloud", 12));
       seaIdx.appendChild(el("b", null, String(sciRound)));
       dual.appendChild(fireIdx);
       dual.appendChild(seaIdx);
@@ -2187,16 +2358,6 @@
         both.title = "火烧云与云海同时达标";
         dsLeft.appendChild(both);
       }
-      
-      function pickPct(k) {
-        var v = pick(k);
-        return v != null ? Math.round(num(v)) + "%" : "—";
-      }
-      var reasonsText = "中云" + pickPct("cloud_mid") + " · " +
-        "卷云" + pickPct("cloud_high") + " · " +
-        "低云" + pickPct("cloud_low") + " · " +
-        "能见度" + (pick("visibility_km") != null ? Math.round(pick("visibility_km")) + "km" : "—");
-      dsLeft.appendChild(el("div", "cds-reasons", reasonsText));
       decStrip.appendChild(dsLeft);
 
       if (ev) {
@@ -2217,23 +2378,47 @@
       if (colour) colL.appendChild(colour);
 
       // 3. 出工实战时刻 (4阶段时间轴)
+      // 宽屏时提升为两列之后的全宽横条；窄屏保持原有的左列位置。
       var tl = timelineBlock(spot);
-      if (tl) colL.appendChild(tl);
+      var wideDetail = window.matchMedia &&
+        window.matchMedia("(min-width: 1180px)").matches;
+      if (tl && !wideDetail) colL.appendChild(tl);
 
       // 3.5 出工胜算 + 逆温/风速
       colL.appendChild(confBlock(stab, win, wp, isFire));
 
-      // 4. PRO 核心气象 (8宫格)
-      colR.appendChild(proGridBlock("⚙️ PRO 核心气象", "PRO", buildProCells(spot)));
-
-      // 5. 模式共识（接在 8 项因子之后，仅展示多源云量一致性）
+      // 4. PRO 核心气象：按 BCI 语义重排为三组，云况层并入多源共识小字
+      var proCells = buildProCells(spot);
+      var proByKey = {};
+      proCells.forEach(function (c) { proByKey[c.k] = c; });
       var consensusEntry = (win && win.consensus) ? win : current;
-      var conBlock = consensusBlock(consensusEntry);
-      if (conBlock) colR.appendChild(conBlock);
+      var con = (consensusEntry && consensusEntry.consensus) || null;
+      var conMap = {
+        "高空卷云": con && con.high,
+        "中云灰幕": con && con.mid,
+        "本地低云": con && con.low
+      };
+      colR.appendChild(proGroupedBlock("gear", "PRO 核心气象", "PRO", [
+        {
+          label: "能不能拍", meta: "门槛", gate: true,
+          cells: [proByKey["太阳高度角"], proByKey["进光廊道"], proByKey["落位偏差"]]
+        },
+        {
+          label: "云况", meta: "权重 55%", primary: true,
+          cells: [proByKey["画布质量"], proByKey["高空卷云"], proByKey["中云灰幕"], proByKey["本地低云"]],
+          con: conMap,
+          after: consensusSourcesEl(consensusEntry)
+        },
+        {
+          label: "视程", meta: "权重 25%", noBar: true, narrow: true,
+          cells: [proByKey["大气能见度"]]
+        }
+      ]));
 
       cols.appendChild(colL);
       cols.appendChild(colR);
       box.appendChild(cols);
+      if (tl && wideDetail) box.appendChild(tl);
 
       var sub = $("detailSubtitle");
       if (sub) sub.textContent = "实战时刻轴与核心物理参数 · " + (spot.region || "—") + " · " + num(spot.elevation_m) + " m";
@@ -2315,7 +2500,9 @@
           var box = $("bannerScroll");
           box.innerHTML = "";
           var e = el("div", "empty");
-          e.appendChild(el("div", "big", "\u26A0\uFE0F"));
+          var big = el("div", "big");
+          big.appendChild(iconEl("warning", 32));
+          e.appendChild(big);
           e.appendChild(el("div", null, "数据加载失败：" + err.message));
           box.appendChild(e);
           if (bust) toast("刷新失败：" + err.message);
@@ -2326,6 +2513,18 @@
     function boot() {
       initTheme();
       $("refreshBtn").addEventListener("click", function () { load(true); });
+      if (window.matchMedia) {
+        var wideMq = window.matchMedia("(min-width: 1180px)");
+        var onWideChange = function () {
+          var s = null;
+          (state.spots || []).forEach(function (x) {
+            if (x.id === state.selectedSpotId) s = x;
+          });
+          if (s) renderSpotDetail(s);
+        };
+        if (wideMq.addEventListener) wideMq.addEventListener("change", onWideChange);
+        else if (wideMq.addListener) wideMq.addListener(onWideChange);
+      }
       load(false);
     }
 
