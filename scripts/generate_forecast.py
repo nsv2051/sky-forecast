@@ -19,6 +19,7 @@ Writes ``public/data/forecast.json`` (structure: ``updated_at``, ``spots``,
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -70,6 +71,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(levelname)s] %(name)s: %(message)s",
+    )
     args = build_parser().parse_args(argv)
     config = load_config(args.spots)
     forecast = build_forecast(
@@ -81,14 +86,19 @@ def main(argv=None) -> int:
     target = save_forecast(forecast, args.output)
 
     meta = forecast["meta"]
+    ground_error = meta.get("ground_error")
+    qweather_status = "qweather=%s" % meta.get("ground_status", "disabled")
+    if ground_error:
+        qweather_status += "(%s)" % str(ground_error)[:120]
     print(
-        "[generate_forecast] wrote %s (%d spots, %d grid points, source=%s, mock=%s)"
+        "[generate_forecast] wrote %s (%d spots, %d grid points, source=%s, mock=%s, %s)"
         % (
             target,
             meta["spot_count"],
             forecast["grid"]["count"] if forecast.get("grid") else 0,
             meta["data_source"],
             meta["mock"],
+            qweather_status,
         )
     )
     return 0

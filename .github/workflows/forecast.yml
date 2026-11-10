@@ -40,9 +40,13 @@ jobs:
 
     env:
       TZ: Asia/Shanghai
-      # Optional secrets. When absent the pipeline falls back to neutral
-      # ground observations, so the workflow succeeds with no configuration.
-      QWEATHER_KEY: ${{ secrets.QWEATHER_KEY }}
+      # Optional QWeather configuration. When absent the pipeline falls back
+      # to neutral ground observations, so the workflow succeeds with no
+      # configuration. QWEATHER_KEY should live in Secrets; QWEATHER_BASE_URL
+      # is not a secret and may live in Variables. Both accept either store,
+      # with Secrets taking precedence.
+      QWEATHER_KEY: ${{ secrets.QWEATHER_KEY || vars.QWEATHER_KEY }}
+      QWEATHER_BASE_URL: ${{ secrets.QWEATHER_BASE_URL || vars.QWEATHER_BASE_URL }}
 
     steps:
       - name: Checkout repository

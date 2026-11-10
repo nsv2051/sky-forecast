@@ -12,11 +12,13 @@ fetchers and the ``--mock`` CLI entry point.
 
 from __future__ import annotations
 
+import gzip
 import importlib.util
 import json
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,7 +27,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.fetcher.open_meteo import OpenMeteoClient, mock_hourly  # noqa: E402
-from core.fetcher.qweather import GroundWeather, QWeatherClient  # noqa: E402
+from core.fetcher.qweather import (  # noqa: E402
+    DEFAULT_BASE_URL,
+    GroundWeather,
+    QWeatherClient,
+)
 from core.pipeline import (  # noqa: E402
     GRID_BOUNDS,
     build_forecast,
@@ -218,6 +224,70 @@ class TestFetcherFallbacks(unittest.TestCase):
         weather = client.fetch(34.5, 112.9)
         self.assertEqual(weather.source, "neutral")
 
+    def test_qweather_status_error_when_enabled_but_fails(self):
+        def boom(url, timeout):
+            raise RuntimeError("api down")
+
+        client = QWeatherClient(key="dummy", transport=boom, retries=0)
+        forecast = build_forecast(
+            load_config(),
+            mock=True,
+            hours=4,
+            start=START,
+            qweather=client,
+            include_grid=False,
+        )
+        meta = forecast["meta"]
+        self.assertEqual(meta["ground_status"], "error")
+        self.assertEqual(meta["ground_source"], "neutral")
+        self.assertTrue(meta["ground_error"])
+
+    def test_qweather_status_ok_when_data_present(self):
+        class FixedQWeather:
+            enabled = True
+            last_error = None
+
+            def fetch(self, lat, lon, name=""):
+                return GroundWeather(source="qweather")
+
+        forecast = build_forecast(
+            load_config(),
+            mock=True,
+            hours=4,
+            start=START,
+            qweather=FixedQWeather(),
+            include_grid=False,
+        )
+        meta = forecast["meta"]
+        self.assertEqual(meta["ground_status"], "ok")
+        self.assertEqual(meta["ground_source"], "qweather")
+        self.assertIsNone(meta["ground_error"])
+
+    def test_qweather_v1_uses_header_auth(self):
+        seen_urls = []
+        seen_headers = []
+
+        def transport(url, timeout, headers=None):
+            seen_urls.append(url)
+            seen_headers.append(headers or {})
+            return {
+                "code": "200",
+                "condition": {"text": "晴", "code": "100"},
+                "visibility": {"value": "10000"},
+            }
+
+        client = QWeatherClient(
+            key="k",
+            base_url="https://example.qweatherapi.com",
+            transport=transport,
+            retries=0,
+        )
+        weather = client.fetch(34.5, 112.9)
+        self.assertEqual(weather.source, "qweather")
+        self.assertTrue(any("/weather/v1/current/" in url for url in seen_urls))
+        self.assertTrue(all("key=" not in url for url in seen_urls))
+        self.assertTrue(all("X-QW-Api-Key" in headers for headers in seen_headers))
+
 
 class TestGenerateScript(unittest.TestCase):
     def test_mock_cli_writes_valid_json(self):
@@ -318,6 +388,105 @@ class TestFetchSeriesFailure(unittest.TestCase):
         message = str(ctx.exception)
         self.assertIn("simulated outage", message)
         self.assertIn("1 coordinates", message)
+
+
+class TestQWeatherV1Fixes(unittest.TestCase):
+    class _FakeResponse:
+        def __init__(self, body, headers=None):
+            self._body = body
+            self.headers = headers or {}
+
+        def read(self):
+            return self._body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def test_qweather_gzip_response_is_parsed(self):
+        payload = {
+            "code": "200",
+            "condition": {"text": "晴", "code": "100"},
+            "visibility": {"value": "10000"},
+        }
+        raw = gzip.compress(json.dumps(payload).encode("utf-8"))
+        response = self._FakeResponse(
+            raw, {"Content-Encoding": "gzip", "Content-Type": "application/json"}
+        )
+        with mock.patch("urllib.request.urlopen", return_value=response):
+            client = QWeatherClient(
+                key="k", base_url="https://abc.qweatherapi.com", retries=0
+            )
+            weather = client.fetch(34.75, 113.62)
+        self.assertEqual(weather.source, "qweather")
+        self.assertEqual(client.last_status, "ok")
+
+    def test_qweather_v1_uses_two_decimal_places(self):
+        seen_urls = []
+
+        def transport(url, timeout, headers=None):
+            seen_urls.append(url)
+            return {
+                "code": "200",
+                "condition": {"text": "晴", "code": "100"},
+                "visibility": {"value": "10000"},
+            }
+
+        client = QWeatherClient(
+            key="k",
+            base_url="https://abc.qweatherapi.com",
+            transport=transport,
+            retries=0,
+        )
+        client.fetch(34.756, 113.628)
+        self.assertTrue(seen_urls)
+        for url in seen_urls:
+            if "/weather/v1/current/" in url:
+                coords = url.split("/weather/v1/current/", 1)[1].split("?", 1)[0]
+                self.assertRegex(coords, r"^\d+\.\d{2}/\d+\.\d{2}$")
+
+    def test_qweather_v1_prefers_qaqi(self):
+        def transport(url, timeout, headers=None):
+            if "/airquality/v1/current/" in url:
+                return {
+                    "indexes": [
+                        {"code": "local", "name": "当地标准", "aqi": 180},
+                        {"code": "qaqi", "name": "和风通用", "aqi": 42},
+                    ]
+                }
+            return {
+                "code": "200",
+                "condition": {"text": "晴", "code": "100"},
+                "visibility": {"value": "10000"},
+            }
+
+        client = QWeatherClient(
+            key="k",
+            base_url="https://abc.qweatherapi.com",
+            transport=transport,
+            retries=0,
+        )
+        weather = client.fetch(34.75, 113.62)
+        self.assertEqual(weather.aqi, 42.0)
+
+    def test_base_url_without_scheme_is_normalized(self):
+        client = QWeatherClient(key="k", base_url="abc.qweatherapi.com")
+        self.assertEqual(client.base_url, "https://abc.qweatherapi.com")
+        self.assertTrue(client._use_v1)
+
+    def test_base_url_trailing_slash_and_v7_stripped(self):
+        client = QWeatherClient(key="k", base_url="https://abc.qweatherapi.com/v7/")
+        self.assertEqual(client.base_url, "https://abc.qweatherapi.com")
+
+    def test_base_url_default_is_v7(self):
+        client = QWeatherClient(key="k")
+        self.assertFalse(client._use_v1)
+
+    def test_base_url_empty_falls_back(self):
+        client = QWeatherClient(key="k", base_url="")
+        self.assertEqual(client.base_url, DEFAULT_BASE_URL)
 
 
 def main():

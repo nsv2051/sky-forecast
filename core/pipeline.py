@@ -1070,6 +1070,8 @@ def build_forecast(
                 "hours": hours,
                 "mock": mock,
                 "consensus_models": [],
+                "ground_status": "disabled",
+                "ground_error": None,
             },
             "spots": [],
             "grid": None,
@@ -1098,7 +1100,14 @@ def build_forecast(
     grounds = {}
     for spot in spots:
         grounds[spot["id"]] = qw.fetch(spot["lat"], spot["lon"], spot.get("name", ""))
-    ground_source = "qweather" if qw.enabled else "neutral"
+    ok_count = sum(1 for ground in grounds.values() if ground.source == "qweather")
+    if ok_count > 0:
+        qweather_status = "ok"
+    elif qw.enabled:
+        qweather_status = "error"
+    else:
+        qweather_status = "disabled"
+    ground_source = "qweather" if qweather_status == "ok" else "neutral"
 
     spots_out = []
     for index, spot in enumerate(spots):
@@ -1153,6 +1162,8 @@ def build_forecast(
             "data_source": "open-meteo-live" if live else data_source,
             "consensus_models": list(consensus_models),
             "ground_source": ground_source,
+            "ground_status": qweather_status,
+            "ground_error": qw.last_error if qweather_status == "error" else None,
             "ground_visibility_source": (
                 "qweather" if ground_source == "qweather" else "open-meteo"
             ),

@@ -173,8 +173,16 @@
   .brand-sub { font-size: 12px; color: var(--text-3-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nav-spacer { flex: 1 1 auto; }
   .nav-meta { display: flex; align-items: center; gap: var(--space-2); color: var(--text-3-ink); font-size: 12px; }
-  .src-chips { display: none; gap: 6px; }
-  @media (min-width: 780px) { .src-chips { display: flex; } }
+  .src-chips {
+    display: flex; gap: 6px; flex: 1 1 auto; min-width: 0;
+    flex-wrap: nowrap; overflow-x: auto;
+    justify-content: flex-end;
+    justify-content: safe flex-end;
+    scrollbar-width: none; -ms-overflow-style: none;
+  }
+  .src-chips::-webkit-scrollbar { display: none; }
+  .src-chips .chip { flex: 0 0 auto; white-space: nowrap; }
+  @media (min-width: 780px) { .src-chips { overflow-x: visible; } }
   .chip {
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 11px; font-weight: 560; color: var(--text-2);
@@ -182,6 +190,7 @@
     padding: 4px 9px; border-radius: 999px; white-space: nowrap;
   }
   .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+  @media (max-width: 400px) { .src-chips .chip { padding: 4px 6px; } }
 
   .icon-btn {
     -webkit-appearance: none; appearance: none;
@@ -1107,7 +1116,16 @@
       var ds = String(meta.data_source || "");
       var live = ds.indexOf("open-meteo") === 0;
       var consensus = Array.isArray(meta.consensus_models) ? meta.consensus_models : [];
+      var groundStatus = meta.ground_status;
+      var qwOk = groundStatus ? groundStatus === "ok" : meta.ground_source === "qweather";
+      var qwError = groundStatus === "error";
       var sources = [
+        {
+          label: "QWeather" + (qwError ? " ·失败" : ""),
+          on: qwOk,
+          error: qwError,
+          title: qwError ? (meta.ground_error || "QWeather 请求失败") : ""
+        },
         { label: live ? "Open-Meteo" : (ds === "mock" ? "演示数据" : "数据源"), on: live }
       ];
       [
@@ -1117,12 +1135,18 @@
       ].forEach(function (m) {
         sources.push({ label: m.label, on: consensus.indexOf(m.id) >= 0 });
       });
-      sources.push({ label: "QWeather", on: meta.ground_source === "qweather" });
       sources.push({ label: "物理光路推算", on: true });
       sources.forEach(function (s) {
         var c = el("span", "chip");
+        if (s.title) { c.title = s.title; }
         var dot = el("span", "dot");
-        if (!s.on) { dot.style.background = "var(--text-3)"; dot.style.boxShadow = "none"; }
+        if (s.error) {
+          dot.style.background = "var(--poor)";
+          dot.style.boxShadow = "none";
+        } else if (!s.on) {
+          dot.style.background = "var(--text-3)";
+          dot.style.boxShadow = "none";
+        }
         c.appendChild(dot);
         c.appendChild(document.createTextNode(s.label));
         chips.appendChild(c);
