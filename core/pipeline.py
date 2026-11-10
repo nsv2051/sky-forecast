@@ -254,20 +254,44 @@ def _pressure_profile(series: HourlySeries, index: int) -> list:
 
 
 def _ground_obs(ground, series, index):
-    """返回 (visibility_km, aqi, source)。
+    """返回 (visibility_km, aqi, visibility_source, aqi_source)。
 
-    和风地面观测可用时以其为准；降级为 neutral 时：
-    - visibility 改用 Open-Meteo 逐时 visibility（米 -> 公里），
-      因为它同样是实测/模式地面能见度，且逐时变化；
-    - aqi 无从获得，返回 None（不施加气溶胶惩罚），
-      绝不用兜底常数 50 伪装成观测。
+    能见度优先取 Open-Meteo 逐时 visibility（米 -> 公里），以保留日变化
+    与清晨雾、午后消散；和风能见度只是单点瞬时快照，铺满 24 小时反而
+    丢失时间分辨率，仅当逐时值缺失时才回退到它。
+
+    AQI 只由和风提供：和风不可用时返回 None 并标记来源 none，不施加
+    气溶胶惩罚，绝不用兜底常数 50 伪装成观测。
     """
-    if ground.source != "neutral":
-        return float(ground.visibility_km), ground.aqi, "qweather"
     raw = series.value("visibility", index)
-    if raw is None:
-        return float(ground.visibility_km), None, "open-meteo"
-    return max(0.1, float(raw) / 1000.0), None, "open-meteo"
+    if raw is not None:
+        visibility_km = max(0.1, float(raw) / 1000.0)
+        visibility_source = "open-meteo"
+    elif ground.source != "neutral":
+        visibility_km = float(ground.visibility_km)
+        visibility_source = "qweather"
+    else:
+        visibility_km = float(ground.visibility_km)
+        visibility_source = "neutral"
+
+    if ground.source != "neutral" and ground.aqi is not None:
+        aqi = ground.aqi
+        aqi_source = "qweather"
+    else:
+        aqi = None
+        aqi_source = "none"
+
+    return visibility_km, aqi, visibility_source, aqi_source
+
+
+def _summarize_sources(values) -> str:
+    """Uniform source name when all equal, otherwise ``mixed``."""
+    unique = set(values)
+    if not unique:
+        return "none"
+    if len(unique) == 1:
+        return unique.pop()
+    return "mixed"
 
 
 _CONSENSUS_LAYERS = ("low", "mid", "high")
@@ -396,7 +420,9 @@ def _hourly_entry(
         start <= local_hour <= end for start, end in SEA_OBSERVABLE_HOURS
     )
     position = solar.solar_position(spot["lat"], spot["lon"], instant)
-    visibility_km, aqi, ground_source = _ground_obs(ground, series, index)
+    visibility_km, aqi, visibility_source, aqi_source = _ground_obs(
+        ground, series, index
+    )
 
     cloud_low = float(_value(series, "cloud_cover_low", index, 0.0))
     cloud_mid = float(_value(series, "cloud_cover_mid", index, 0.0))
@@ -463,7 +489,9 @@ def _hourly_entry(
         "cloud_high": round(cloud_high, 1),
         "visibility_km": round(float(visibility_km), 1),
         "aqi": None if aqi is None else round(float(aqi), 1),
-        "ground_source": ground_source,
+        "ground_source": ground.source,
+        "visibility_source": visibility_source,
+        "aqi_source": aqi_source,
         "wind_speed_10m": None if wind is None else round(float(wind), 1),
         "color_hex": light["hex"],
         "color_name": light["name"],
@@ -1124,6 +1152,17 @@ def build_forecast(
             )
         )
 
+    visibility_sources = [
+        entry["visibility_source"]
+        for spot in spots_out
+        for entry in spot["hourly"]
+    ]
+    aqi_sources = [
+        entry["aqi_source"]
+        for spot in spots_out
+        for entry in spot["hourly"]
+    ]
+
     grid = None
     if include_grid:
         coordinates = list(grid_coordinates(bounds, grid_step))
@@ -1164,9 +1203,8 @@ def build_forecast(
             "ground_source": ground_source,
             "ground_status": qweather_status,
             "ground_error": qw.last_error if qweather_status == "error" else None,
-            "ground_visibility_source": (
-                "qweather" if ground_source == "qweather" else "open-meteo"
-            ),
+            "ground_visibility_source": _summarize_sources(visibility_sources),
+            "ground_aqi_source": _summarize_sources(aqi_sources),
             "generated_at": _iso_utc(datetime.now(timezone.utc)),
         },
         "spots": spots_out,

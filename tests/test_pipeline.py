@@ -289,6 +289,106 @@ class TestFetcherFallbacks(unittest.TestCase):
         self.assertTrue(all("X-QW-Api-Key" in headers for headers in seen_headers))
 
 
+class TestGroundObservationSources(unittest.TestCase):
+    HOURS = 4
+
+    class _SeriesClient:
+        def __init__(self, series_list):
+            self.series_list = series_list
+
+        def mock(self, coordinates, *, hours, start, variables):
+            return self.series_list
+
+    class _FixedQWeather:
+        enabled = True
+        last_error = None
+
+        def __init__(self, visibility_km=16.03, aqi=42.0):
+            self._visibility_km = visibility_km
+            self._aqi = aqi
+
+        def fetch(self, lat, lon, name=""):
+            return GroundWeather(
+                visibility_km=self._visibility_km,
+                aqi=self._aqi,
+                source="qweather",
+            )
+
+    class _NeutralQWeather:
+        enabled = False
+        last_error = None
+
+        def fetch(self, lat, lon, name=""):
+            return GroundWeather(source="neutral")
+
+    def _series(self, config, visibility):
+        coords = [(spot["lat"], spot["lon"]) for spot in config["spots"]]
+        series_list = mock_hourly(coords, hours=self.HOURS, start=START)
+        for series in series_list:
+            series.variables["visibility"] = list(visibility)
+            series.variables["cloud_cover_low"] = [10.0] * self.HOURS
+            series.variables["cloud_cover_mid"] = [50.0] * self.HOURS
+            series.variables["cloud_cover_high"] = [30.0] * self.HOURS
+        return series_list
+
+    def _build(self, visibility, qweather):
+        config = load_config()
+        return build_forecast(
+            config,
+            mock=True,
+            hours=self.HOURS,
+            start=START,
+            open_meteo=self._SeriesClient(self._series(config, visibility)),
+            qweather=qweather,
+            include_grid=False,
+        )
+
+    def test_visibility_prefers_open_meteo_when_qweather_ok(self):
+        forecast = self._build(
+            [12000, 8000, 6000, 10000], self._FixedQWeather(visibility_km=16.03)
+        )
+        values = [
+            entry["visibility_km"] for entry in forecast["spots"][0]["hourly"]
+        ]
+        self.assertEqual(values, [12.0, 8.0, 6.0, 10.0])
+        self.assertEqual(
+            forecast["spots"][0]["hourly"][0]["visibility_source"], "open-meteo"
+        )
+
+    def test_visibility_falls_back_to_qweather_when_series_missing(self):
+        forecast = self._build([None] * self.HOURS, self._FixedQWeather(9.46))
+        entry = forecast["spots"][0]["hourly"][0]
+        self.assertEqual(entry["visibility_km"], 9.5)
+        self.assertEqual(entry["visibility_source"], "qweather")
+
+    def test_aqi_comes_from_qweather_only(self):
+        forecast = self._build(
+            [12000] * self.HOURS, self._FixedQWeather(aqi=42.0)
+        )
+        entry = forecast["spots"][0]["hourly"][0]
+        self.assertEqual(entry["aqi"], 42.0)
+        self.assertEqual(entry["aqi_source"], "qweather")
+        self.assertEqual(forecast["meta"]["ground_aqi_source"], "qweather")
+
+    def test_aqi_none_when_neutral(self):
+        forecast = self._build([12000] * self.HOURS, self._NeutralQWeather())
+        entry = forecast["spots"][0]["hourly"][0]
+        self.assertIsNone(entry["aqi"])
+        self.assertEqual(entry["aqi_source"], "none")
+        self.assertEqual(forecast["meta"]["ground_aqi_source"], "none")
+
+    def test_neutral_still_has_no_aqi_penalty(self):
+        forecast = self._build([12000] * self.HOURS, self._NeutralQWeather())
+        for entry in forecast["spots"][0]["hourly"]:
+            self.assertEqual(entry["bci_components"]["aqi"], 1.0)
+
+    def test_meta_visibility_source_reports_mixed(self):
+        forecast = self._build(
+            [12000, None, None, 6000], self._FixedQWeather()
+        )
+        self.assertEqual(forecast["meta"]["ground_visibility_source"], "mixed")
+
+
 class TestGenerateScript(unittest.TestCase):
     def test_mock_cli_writes_valid_json(self):
         module = _load_script_module()
