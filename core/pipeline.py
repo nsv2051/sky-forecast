@@ -20,6 +20,7 @@ import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from core.fetcher import cma
 from core.fetcher.open_meteo import (
     CONSENSUS_MODELS,
     CONSENSUS_VARIABLES,
@@ -87,6 +88,11 @@ GRID_STEP = 0.1
 _MORNING_ELEV = (-5.0, 8.0)
 _EVENING_ELEV = (-5.0, 8.0)
 _CLOUD_FIELDS = ("cloud_low", "cloud_mid", "cloud_high")
+
+# 事件窗口：中心小时前后各一小时内的评分按折扣参与竞争，避免评分
+# 略低但更贴近事件时刻的相邻小时被完全忽略。
+EVENT_WINDOW_DISCOUNT = 0.85
+EVENT_WINDOW_HOURS = 1
 
 # 云海可观测窗口：取自青龙 sunset_monitor 的印证时段（清晨 4-9 时、傍晚 16-19 时）。
 SEA_OBSERVABLE_HOURS = ((4, 9), (16, 19))
@@ -413,6 +419,7 @@ def _hourly_entry(
     ground: GroundWeather,
     index: int,
     models_data: dict | None = None,
+    cma_rows=None,
 ) -> dict:
     instant = _parse_time(series.time[index])
     local_hour = _local(instant).hour
@@ -439,6 +446,45 @@ def _hourly_entry(
         sun_azimuth=position["azimuth"],
         horizon_low_cloud=cloud_low,
     )
+
+    bci_single = bci["bci"]
+    model_bci = {model: None for model in CONSENSUS_MODELS}
+    models = (models_data or {}).get("models") or {}
+    for model in CONSENSUS_MODELS:
+        model_data = models.get(model) or {}
+        model_low = _source_number(model_data.get("cloud_cover_low"), index)
+        model_mid = _source_number(model_data.get("cloud_cover_mid"), index)
+        model_high = _source_number(model_data.get("cloud_cover_high"), index)
+        if model_low is None or model_mid is None or model_high is None:
+            continue
+        model_bci[model] = burning_cloud.compute_bci(
+            cloud_low=model_low,
+            cloud_mid=model_mid,
+            cloud_high=model_high,
+            visibility_km=visibility_km,
+            aqi=aqi,
+            sun_elevation=position["elevation"],
+            sun_azimuth=position["azimuth"],
+            horizon_low_cloud=model_low,
+        )["bci"]
+
+    valid_bci = [value for value in model_bci.values() if value is not None]
+    bci_models_used = len(valid_bci)
+    if bci_models_used >= 2:
+        ordered_bci = sorted(valid_bci)
+        middle = len(ordered_bci) // 2
+        if len(ordered_bci) % 2:
+            bci_median = ordered_bci[middle]
+        else:
+            bci_median = (ordered_bci[middle - 1] + ordered_bci[middle]) / 2.0
+        bci_value = round(bci_median, 1)
+        bci_grade = burning_cloud.grade_bci(bci_median)
+        bci_model_spread = round(max(valid_bci) - min(valid_bci), 1)
+    else:
+        bci_value = bci_single
+        bci_grade = bci["grade"]
+        bci_model_spread = None
+
     sci = sea_of_clouds.compute_sci(
         _pressure_profile(series, index),
         viewpoint_elevation=float(spot["elevation_m"]),
@@ -465,12 +511,47 @@ def _hourly_entry(
         }
     consensus_score = _consensus_score(consensus)
 
+    cma_low_cloud = None
+    cma_visibility_km = None
+    cma_station = None
+    cma_available = False
+    cloud_sea_confirmed = None
+    precipitation_mm = None
+    cma_offset_hours = None
+    if cma_rows:
+        try:
+            station = cma.station_for_spot(spot)
+            local_dt = _local(instant)
+            ld = local_dt.date()
+            lh = local_dt.hour
+            # 降水对所有点位都有意义，纯展示，不参与评分。
+            precipitation_mm, precip_offset = cma.nearest_precipitation(cma_rows, ld, lh)
+            cma_offset_hours = precip_offset
+            if spot.get("preferences", {}).get("sea_of_clouds"):
+                low, low_offset = cma.nearest_low_cloud(cma_rows, ld, lh)
+                vis, vis_offset = cma.nearest_visibility(cma_rows, ld, lh)
+                cma_station = station
+                cma_low_cloud = low
+                cma_visibility_km = vis
+                cma_available = bool(station)
+                offset = vis_offset if vis_offset is not None else low_offset
+                if offset is not None:
+                    cma_offset_hours = offset
+                if sci["status"] == "俯瞰云海" and low is not None:
+                    cloud_sea_confirmed = bool(low >= 60)
+        except Exception:  # noqa: BLE001 - CMA 仅作印证，异常静默降级
+            pass
+
     return {
         "time": _iso_utc(instant),
         "time_local": _local_iso(instant),
-        "bci": bci["bci"],
-        "bci_grade": bci["grade"],
+        "bci": bci_value,
+        "bci_grade": bci_grade,
         "bci_components": bci["components"],
+        "bci_single": bci_single,
+        "bci_models": model_bci,
+        "bci_models_used": bci_models_used,
+        "bci_model_spread": bci_model_spread,
         "sci": sci["sci"],
         "sci_status": sci["status"],
         "sci_state": sci["state"],
@@ -502,6 +583,13 @@ def _hourly_entry(
         "color_deck_height_m": light["deck_height_m"],
         "consensus": consensus,
         "consensus_score": consensus_score,
+        "cma_low_cloud": cma_low_cloud,
+        "cma_visibility_km": cma_visibility_km,
+        "cma_station": cma_station,
+        "cma_available": cma_available,
+        "cloud_sea_confirmed": cloud_sea_confirmed,
+        "precipitation_mm": precipitation_mm,
+        "cma_offset_hours": cma_offset_hours,
     }
 
 
@@ -567,6 +655,26 @@ def _select_best(hourly: list, evening: bool, spot: dict | None = None):
     if not candidates:
         return None
     best = max(candidates, key=lambda item: (item["bci"], item["sci"]))
+    best_index = next(
+        index for index, entry in enumerate(hourly) if entry is best
+    )
+    window_value = float(best["bci"])
+    window_hour = best["time_local"]
+    window_best = None
+    for offset in range(-EVENT_WINDOW_HOURS, EVENT_WINDOW_HOURS + 1):
+        index = best_index + offset
+        if index < 0 or index >= len(hourly):
+            continue
+        entry = hourly[index]
+        value = entry.get("bci")
+        if value is None:
+            continue
+        discounted = float(value) * EVENT_WINDOW_DISCOUNT
+        if window_best is None or discounted > window_best[0]:
+            window_best = (discounted, entry)
+    if window_best is not None and window_best[0] > float(best["bci"]):
+        window_value = window_best[0]
+        window_hour = window_best[1]["time_local"]
     keys = (
         "time",
         "time_local",
@@ -599,6 +707,8 @@ def _select_best(hourly: list, evening: bool, spot: dict | None = None):
     result["event_offset_minutes"] = None
     result["bci_at_event"] = None
     result["sci_at_event"] = None
+    result["bci_window"] = round(window_value, 1)
+    result["bci_window_hour"] = window_hour
     if spot is None:
         return result
 
@@ -614,9 +724,6 @@ def _select_best(hourly: list, evening: bool, spot: dict | None = None):
     event_local = _local(event_instant)
     result["event_offset_minutes"] = int(
         round((sampled_local - event_local).total_seconds() / 60.0)
-    )
-    best_index = next(
-        index for index, entry in enumerate(hourly) if entry is best
     )
     result["bci_at_event"] = _event_value_at(
         hourly, best_index, event_instant, "bci"
@@ -682,6 +789,26 @@ def _select_best_sea(hourly: list):
     if not candidates:
         return None
     best = max(candidates, key=lambda item: item["sci"])
+    best_index = next(
+        index for index, entry in enumerate(hourly) if entry is best
+    )
+    window_value = float(best["sci"])
+    window_hour = best["time_local"]
+    window_best = None
+    for offset in range(-EVENT_WINDOW_HOURS, EVENT_WINDOW_HOURS + 1):
+        index = best_index + offset
+        if index < 0 or index >= len(hourly):
+            continue
+        entry = hourly[index]
+        value = entry.get("sci")
+        if value is None:
+            continue
+        discounted = float(value) * EVENT_WINDOW_DISCOUNT
+        if window_best is None or discounted > window_best[0]:
+            window_best = (discounted, entry)
+    if window_best is not None and window_best[0] > float(best["sci"]):
+        window_value = window_best[0]
+        window_hour = window_best[1]["time_local"]
     keys = (
         "time",
         "time_local",
@@ -692,7 +819,10 @@ def _select_best_sea(hourly: list):
         "cloud_base_m",
         "cloud_top_m",
     )
-    return {key: best[key] for key in keys}
+    result = {key: best[key] for key in keys}
+    result["sci_window"] = round(window_value, 1)
+    result["sci_window_hour"] = window_hour
+    return result
 
 
 def _build_spot(
@@ -701,10 +831,11 @@ def _build_spot(
     ground: GroundWeather,
     hours: int,
     models_data: dict | None = None,
+    cma_rows=None,
 ) -> dict:
     count = min(hours, len(series))
     hourly = [
-        _hourly_entry(spot, series, ground, i, models_data)
+        _hourly_entry(spot, series, ground, i, models_data, cma_rows)
         for i in range(count)
     ]
     best_evening = _select_best(hourly, evening=True, spot=spot)
@@ -1137,11 +1268,27 @@ def build_forecast(
         qweather_status = "disabled"
     ground_source = "qweather" if qweather_status == "ok" else "neutral"
 
+    cma_cache = {}
+    if not mock:
+        for spot in spots:
+            try:
+                station = cma.station_for_spot(spot)
+                if station and station not in cma_cache:
+                    cma_cache[station] = cma.fetch_hourly(station)
+            except Exception:  # noqa: BLE001 - CMA 仅作印证，异常静默降级
+                continue
+
     spots_out = []
     for index, spot in enumerate(spots):
         series = series_by_index.get(index)
         if series is None:
             series = HourlySeries(latitude=spot["lat"], longitude=spot["lon"])
+        cma_rows = None
+        if not mock:
+            try:
+                cma_rows = cma_cache.get(cma.station_for_spot(spot))
+            except Exception:  # noqa: BLE001 - CMA 仅作印证，异常静默降级
+                cma_rows = None
         spots_out.append(
             _build_spot(
                 spot,
@@ -1149,6 +1296,7 @@ def build_forecast(
                 grounds[spot["id"]],
                 hours,
                 models_by_index.get(index),
+                cma_rows,
             )
         )
 
