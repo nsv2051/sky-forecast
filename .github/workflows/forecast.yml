@@ -36,7 +36,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     env:
       TZ: Asia/Shanghai
@@ -64,7 +64,8 @@ jobs:
 
       - name: Generate forecast JSON
         run: |
-          max_attempts=3
+          max_attempts=5
+          wait_seconds=60
           attempt=1
           while :; do
             if [ "${{ github.event.inputs.force_mock }}" = "true" ]; then
@@ -79,8 +80,8 @@ jobs:
               echo "all $max_attempts attempts failed"
               exit 1
             fi
-            echo "attempt $attempt/$max_attempts failed, retrying in 30s"
-            sleep 30
+            echo "attempt $attempt/$max_attempts failed, retrying in ${wait_seconds}s"
+            sleep "$wait_seconds"
             attempt=$((attempt + 1))
           done
 
