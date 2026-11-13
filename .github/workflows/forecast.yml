@@ -64,11 +64,25 @@ jobs:
 
       - name: Generate forecast JSON
         run: |
-          if [ "${{ github.event.inputs.force_mock }}" = "true" ]; then
-            python3 scripts/generate_forecast.py --mock --no-grid
-          else
-            python3 scripts/generate_forecast.py --no-grid
-          fi
+          max_attempts=3
+          attempt=1
+          while :; do
+            if [ "${{ github.event.inputs.force_mock }}" = "true" ]; then
+              python3 scripts/generate_forecast.py --mock --no-grid && status=ok || status=fail
+            else
+              python3 scripts/generate_forecast.py --no-grid && status=ok || status=fail
+            fi
+            if [ "$status" = "ok" ]; then
+              break
+            fi
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "all $max_attempts attempts failed"
+              exit 1
+            fi
+            echo "attempt $attempt/$max_attempts failed, retrying in 30s"
+            sleep 30
+            attempt=$((attempt + 1))
+          done
 
       - name: Verify generated data
         run: |
