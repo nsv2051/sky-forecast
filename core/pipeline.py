@@ -445,6 +445,7 @@ def _hourly_entry(
         sun_elevation=position["elevation"],
         sun_azimuth=position["azimuth"],
         horizon_low_cloud=cloud_low,
+        elevation_m=float(spot["elevation_m"]),
     )
 
     bci_single = bci["bci"]
@@ -466,6 +467,7 @@ def _hourly_entry(
             sun_elevation=position["elevation"],
             sun_azimuth=position["azimuth"],
             horizon_low_cloud=model_low,
+            elevation_m=float(spot["elevation_m"]),
         )["bci"]
 
     valid_bci = [value for value in model_bci.values() if value is not None]
@@ -942,6 +944,7 @@ def _snapshot_point(series: HourlySeries, index: int, lat: float, lon: float,
     cloud_mid = float(_value(series, "cloud_cover_mid", index, 0.0))
     cloud_high = float(_value(series, "cloud_cover_high", index, 0.0))
     wind = _value(series, "wind_speed_10m", index)
+    elevation = series.elevation if series.elevation is not None else 0.0
 
     bci = burning_cloud.compute_bci(
         cloud_low=cloud_low,
@@ -952,8 +955,8 @@ def _snapshot_point(series: HourlySeries, index: int, lat: float, lon: float,
         sun_elevation=position["elevation"],
         sun_azimuth=position["azimuth"],
         horizon_low_cloud=cloud_low,
+        elevation_m=float(elevation),
     )
-    elevation = series.elevation if series.elevation is not None else 0.0
     sci = sea_of_clouds.compute_sci(
         _pressure_profile(series, index),
         viewpoint_elevation=float(elevation),

@@ -204,6 +204,83 @@ class TestBurningCloud(unittest.TestCase):
         )
         self.assertGreaterEqual(result["bci"], 92.0)
 
+    def test_aqi_elevation_zero_is_identity(self):
+        kwargs = dict(
+            cloud_low=8,
+            cloud_mid=25,
+            cloud_high=58,
+            visibility_km=26.4,
+            sun_elevation=1.5,
+            aqi=60,
+        )
+        base = burning_cloud.compute_bci(**kwargs)
+        zero = burning_cloud.compute_bci(**kwargs, elevation_m=0.0)
+        self.assertEqual(base["bci"], zero["bci"])
+        self.assertEqual(
+            base["components"]["aqi"], zero["components"]["aqi"]
+        )
+
+    def test_aqi_elevation_none_is_identity(self):
+        kwargs = dict(
+            cloud_low=8,
+            cloud_mid=25,
+            cloud_high=58,
+            visibility_km=26.4,
+            sun_elevation=1.5,
+            aqi=60,
+        )
+        base = burning_cloud.compute_bci(**kwargs)
+        none = burning_cloud.compute_bci(**kwargs, elevation_m=None)
+        self.assertEqual(base["bci"], none["bci"])
+        self.assertEqual(
+            base["components"]["aqi"], none["components"]["aqi"]
+        )
+
+    def test_aqi_elevation_mountain_is_cleaner(self):
+        kwargs = dict(
+            cloud_low=8,
+            cloud_mid=25,
+            cloud_high=58,
+            visibility_km=26.4,
+            sun_elevation=1.5,
+            aqi=60,
+        )
+        lowland = burning_cloud.compute_bci(**kwargs, elevation_m=0)
+        mountain = burning_cloud.compute_bci(**kwargs, elevation_m=2217)
+        self.assertGreater(mountain["bci"], lowland["bci"])
+        self.assertGreater(
+            mountain["components"]["aqi"], lowland["components"]["aqi"]
+        )
+
+    def test_aqi_elevation_monotonic(self):
+        kwargs = dict(
+            cloud_low=8,
+            cloud_mid=25,
+            cloud_high=58,
+            visibility_km=26.4,
+            sun_elevation=1.5,
+            aqi=60,
+        )
+        prev = None
+        for elev in range(0, 3001, 100):
+            result = burning_cloud.compute_bci(**kwargs, elevation_m=elev)
+            comp = result["components"]["aqi"]
+            if prev is not None:
+                self.assertGreaterEqual(comp, prev - 1e-12)
+            prev = comp
+
+    def test_aqi_elevation_keeps_lowland_penalty(self):
+        result = burning_cloud.compute_bci(
+            cloud_low=8,
+            cloud_mid=25,
+            cloud_high=58,
+            visibility_km=26.4,
+            sun_elevation=1.5,
+            aqi=200,
+            elevation_m=109,
+        )
+        self.assertLess(result["components"]["aqi"], 0.50)
+
 
 class TestSeaOfClouds(unittest.TestCase):
     def test_overlook_sea_of_clouds(self):

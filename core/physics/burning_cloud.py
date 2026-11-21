@@ -129,6 +129,7 @@ _FLOOR = 0.01
 _AQI_KNEE = 30.0    # AQI 低于等于此值视为清洁，不扣分
 _AQI_FLOOR = 0.25   # 极端污染时的渐近地板
 _AQI_TAU = 120.0    # 衰减尺度（AQI 单位）
+_AQI_SCALE_HEIGHT = 900.0  # 气溶胶标高（米），浓度随海拔指数衰减的特征高度
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -215,8 +216,26 @@ def _visibility_score(visibility_km: float) -> float:
     return _smoothstep(2.0, 30.0, visibility_km)
 
 
+def _aqi_elevation_adjusted(aqi: float, elevation_m: float | None) -> float:
+    """把地面 AQI 折算到观测海拔上的等效 AQI。
+
+    气溶胶集中在边界层内，浓度随高度近似指数衰减；山顶观景点
+    看到的空气远比地面清洁。只衰减超出清洁基线 _AQI_KNEE 的部分，
+    海拔 0 时与输入完全相同（保持向后兼容）。
+    """
+    value = float(aqi)
+    if elevation_m is None or elevation_m <= 0.0:
+        return value
+    if value <= _AQI_KNEE:
+        return value
+    return _AQI_KNEE + (value - _AQI_KNEE) * math.exp(-float(elevation_m) / _AQI_SCALE_HEIGHT)
+
+
 def _aqi_score(aqi: float) -> float:
     """AQI 对火烧云透光的衰减系数（0.25-1.0，指数衰减）。
+
+    输入的 AQI 先经 :func:`_aqi_elevation_adjusted` 做海拔折算
+    （把地面 AQI 折算到观测海拔），再进本函数。
 
     为什么是指数而不是线性：线性扣分式 ``1 - (aqi-30)/170`` 会在
     ``aqi = 30 + 0.6*170 = 132`` 处提前撞到下限，此后被 clamp 死在
@@ -390,6 +409,7 @@ def compute_bci(
     horizon_low_cloud: float | None = None,
     light_path=None,
     humidity: float | None = None,
+    elevation_m: float | None = None,
 ) -> dict:
     """Compute the Burning Cloud Index.
 
@@ -414,6 +434,9 @@ def compute_bci(
     humidity:
         Optional 2 m relative humidity (%), used for the transparency
         confidence correction (thick + humid = rain-stratus, blocked).
+    elevation_m:
+        观测点海拔（米）；用于把地面 AQI 折算到该高度，``None`` 表示
+        不修正。
 
     Returns
     -------
@@ -480,7 +503,9 @@ def compute_bci(
     comp_visibility = max(_FLOOR, _visibility_score(visibility_km))
     comp_sun = _sun_score(sun_elevation, cloud_mid, cloud_high)
     comp_aqi = (
-        max(_FLOOR, _aqi_score(float(aqi))) if aqi is not None else 1.0
+        max(_FLOOR, _aqi_score(_aqi_elevation_adjusted(aqi, elevation_m)))
+        if aqi is not None
+        else 1.0
     )
 
     bci = 100.0 * (
