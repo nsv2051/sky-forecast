@@ -125,6 +125,11 @@ _WEIGHT_AQI = 0.20
 
 _FLOOR = 0.01
 
+# --- AQI 指数衰减（替代线性 clamp） ----------------------------------------
+_AQI_KNEE = 30.0    # AQI 低于等于此值视为清洁，不扣分
+_AQI_FLOOR = 0.25   # 极端污染时的渐近地板
+_AQI_TAU = 120.0    # 衰减尺度（AQI 单位）
+
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
@@ -211,7 +216,30 @@ def _visibility_score(visibility_km: float) -> float:
 
 
 def _aqi_score(aqi: float) -> float:
-    return _clamp(1.0 - (aqi - 30.0) / 170.0, 0.4, 1.0)
+    """AQI 对火烧云透光的衰减系数（0.25-1.0，指数衰减）。
+
+    为什么是指数而不是线性：线性扣分式 ``1 - (aqi-30)/170`` 会在
+    ``aqi = 30 + 0.6*170 = 132`` 处提前撞到下限，此后被 clamp 死在
+    0.4000。指数衰减没有这个"撞墙点"，从 knee 开始单调递减、渐近
+    收敛到地板，在任意 AQI 区间（包括重污染区间）都保持分辨力。
+
+    0.25 地板的物理含义：即使 AQI 极端爆表，气溶胶层也不会把掠射光
+    完全吞没，仍有一段残余透光（近地面消光不可能达到 100%），所以
+    衰减不归零，而是渐近到 0.25。
+
+    历史教训（勿改回线性）：旧实现 ``_clamp(1.0 - (aqi - 30.0)/170.0,
+    0.4, 1.0)`` 在 AQI 132 / 150 / 200 / 300 / 500 输出完全相同
+    （恒为 0.400000），最该区分的重污染区间彻底失去分辨力。
+    """
+    value = float(aqi)
+    if value <= _AQI_KNEE:
+        return 1.0
+    return _clamp(
+        _AQI_FLOOR
+        + (1.0 - _AQI_FLOOR) * math.exp(-(value - _AQI_KNEE) / _AQI_TAU),
+        _AQI_FLOOR,
+        1.0,
+    )
 
 
 def deck_shadow_limit_deg(deck_height_m: float) -> float:

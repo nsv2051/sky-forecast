@@ -174,6 +174,36 @@ class TestBurningCloud(unittest.TestCase):
         hazy = burning_cloud.compute_bci(20, 50, 40, visibility_km=25, aqi=200)["bci"]
         self.assertGreater(clean, hazy)
 
+    def test_aqi_score_monotonic(self):
+        prev = burning_cloud._aqi_score(0)
+        for aqi in range(0, 601):
+            score = burning_cloud._aqi_score(aqi)
+            self.assertLessEqual(score, prev + 1e-12)
+            prev = score
+
+    def test_aqi_score_discriminates_heavy_pollution(self):
+        scores = [burning_cloud._aqi_score(a) for a in (132, 150, 200, 300, 400)]
+        for hi, lo in zip(scores[1:], scores[:-1]):
+            self.assertGreater(lo - hi, 1e-6)
+
+    def test_aqi_score_boundaries(self):
+        for aqi in (-10, 0, 15, 30):
+            self.assertEqual(burning_cloud._aqi_score(aqi), 1.0)
+        extreme = burning_cloud._aqi_score(2000)
+        self.assertGreaterEqual(extreme, 0.25)
+        self.assertLessEqual(extreme, 1.0)
+
+    def test_ideal_scenario_regression(self):
+        result = burning_cloud.compute_bci(
+            cloud_low=8,
+            cloud_mid=25,
+            cloud_high=58,
+            visibility_km=25.0,
+            sun_elevation=1.5,
+            aqi=35,
+        )
+        self.assertGreaterEqual(result["bci"], 92.0)
+
 
 class TestSeaOfClouds(unittest.TestCase):
     def test_overlook_sea_of_clouds(self):
